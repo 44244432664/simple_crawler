@@ -936,7 +936,7 @@ class WikiCrawler:
                 pbar.update(1)
                 i += 1
                 tries = 0
-                time.sleep(0.5)  # To avoid overwhelming the server
+                # time.sleep(0.2)  # To avoid overwhelming the server
             except Exception as e:
                 print(f"\nError processing chapter {i}: {e}")
                 print("Trying again...")
@@ -1262,7 +1262,9 @@ class WikiCrawler:
         book.add_item(intro)
         toc.append(intro)
         spine.append(intro)
-        spine.append("nav")
+        
+        if self.novel_info["num_chapters"] <= 100:
+            spine.append("nav")
         
         # Add chapters
         # for chapter in self.novel_info["chapters"]:

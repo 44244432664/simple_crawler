@@ -7,6 +7,7 @@ import zipfile
 import os
 import time
 import math
+import tqdm
 # driver = webdriver.Chrome()
 
 class QQCrawler:
@@ -121,11 +122,11 @@ class QQCrawler:
             return "error"
         
         if not os.path.exists(f"{self.path}/chapter {chapter_num}"):
-            print(f"Creating directory for chapter {chapter_num}...")
+            # print(f"Creating directory for chapter {chapter_num}...")
             # create directory for chapter
             chapter_path = os.path.join(self.path, f"chapter {chapter_num}")
             os.makedirs(chapter_path, exist_ok=True)
-            print(f"Directory created: {chapter_path}")
+            # print(f"Directory created: {chapter_path}")
         
         response = requests.get(chapter_link)
         if response.status_code != 200:
@@ -145,7 +146,7 @@ class QQCrawler:
         # self.img_links = self.img_links[1:]
         # open("chapter_data.txt", "w", encoding="utf-8").write("\n".join(self.img_links))
             
-        print("Total img links: ", len(img_links))
+        # print("Total img links: ", len(img_links))
         # print("Total links: ", len(response))
         # print(links[0:5])
         # return "chapter img"
@@ -215,7 +216,7 @@ class QQCrawler:
                     i += 1
                 time.sleep(1)  # sleep for 1 second before trying again
                 continue
-        print("Total images saved: ", len(fnames))
+        # print("Total images saved: ", len(fnames))
         # # return fnames  # return list of filenames
         return "imgs"
 
@@ -230,37 +231,37 @@ class QQCrawler:
             return "error"
         img_ext = [".jpg", ".jpeg", ".png", ".gif"]
         fnames = [i for i in os.listdir(os.path.join(self.path, f"chapter {chapter}")) if os.path.splitext(i)[1].lower() in img_ext]
-        print("Filenames before sorting: ", fnames)
+        # print("Filenames before sorting: ", fnames)
         fnames.sort(key=lambda x: int(re.search(r'\d+', x).group()))  # sort by number in filename
         # if delete_page_0 is True, remove first page
-        print("Sorted filenames: ", fnames)
-        print("argument delete_page_0: ", delete_page_0)
+        # print("Sorted filenames: ", fnames)
+        # print("argument delete_page_0: ", delete_page_0)
         if delete_page_0 and len(fnames) > 0:
-            print("Deleting first page...")
+            # print("Deleting first page...")
             fnames = fnames[1:]  # remove first page
         # fnames = fnames[:4]   # limit to first 4 images for testing
-        print("Filenames: ", fnames)
+        # print("Filenames: ", fnames)
         if not fnames:
             print(f"No images found in {self.path}/chapter {chapter}")
             return "error"
         # sort filenames
-        print(f"Total: {len(fnames)} images found in chapter {chapter}")
+        # print(f"Total: {len(fnames)} images found in chapter {chapter}")
         if not os.path.exists(self.path+"/chapter "+str(chapter)):
             print("No img directory found")
             return "error"
         # create pdf from images
         try:
             imgs = [Image.open(os.path.join(self.path+"/chapter "+str(chapter), i)) for i in fnames]
-            print("Total images: ", len(imgs))
+            # print("Total images: ", len(imgs))
             ImageFile.LOAD_TRUNCATED_IMAGES = True  # allow truncated images
             imgs[0].save(f"{self.path}/chapter {str(chapter)}.pdf", "PDF", save_all=True, append_images=imgs[1:], resolution=100.0) # , quality=95)
-            print("Saved chapter "+ str(chapter))
+            # print("Saved chapter "+ str(chapter))
             # os.rmdir(f"{self.path}/chapter {str(chapter)}")  # remove img directory after creating pdf
             import shutil
 
             # Remove directory and all its contents
             shutil.rmtree(f"{self.path}/chapter {str(chapter)}")
-            print(f"Removed chapter {chapter} directory after creating pdf")
+            # print(f"Removed chapter {chapter} directory after creating pdf")
         except Exception as e:
             print("Error creating pdf: ", e)
             return "error"
@@ -276,21 +277,21 @@ class QQCrawler:
             return "error"
         img_ext = [".jpg", ".jpeg", ".png", ".gif"]
         fnames = [i for i in os.listdir(os.path.join(self.path, f"chapter {chapter}")) if os.path.splitext(i)[1].lower() in img_ext]
-        print("Filenames before sorting: ", fnames)
+        # print("Filenames before sorting: ", fnames)
         fnames.sort(key=lambda x: int(re.search(r'\d+', x).group()))  # sort by number in filename
         # if delete_page_0 is True, remove first page
-        print("Sorted filenames: ", fnames)
-        print("argument delete_page_0: ", delete_page_0)
+        # print("Sorted filenames: ", fnames)
+        # print("argument delete_page_0: ", delete_page_0)
         if delete_page_0 and len(fnames) > 0:
-            print("Deleting first page...")
+            # print("Deleting first page...")
             fnames = fnames[1:]
         # fnames = fnames[:4]   # limit to first 4 images for testing
-        print("Filenames: ", fnames)
+        # print("Filenames: ", fnames)
         if not fnames:
             print(f"No images found in {self.path}/chapter {chapter}")
             return "error"
         # sort filenames
-        print(f"Total: {len(fnames)} images found in chapter {chapter}")
+        # print(f"Total: {len(fnames)} images found in chapter {chapter}")
         if not os.path.exists(self.path+"/chapter "+str(chapter)):
             print("No img directory found")
             return "error"
@@ -299,7 +300,7 @@ class QQCrawler:
             with zipfile.ZipFile(f"{self.path}/chapter {str(chapter)}.cbz", "w") as cbz:
                 for img in fnames:
                     cbz.write(os.path.join(self.path, f"chapter {chapter}", img), img)
-            print("Saved chapter "+ str(chapter))
+            # print("Saved chapter "+ str(chapter))
         except Exception as e:
             print("Error creating cbz: ", e)
             return "error"
@@ -307,7 +308,7 @@ class QQCrawler:
         # remove img directory after creating cbz
         import shutil
         shutil.rmtree(f"{self.path}/chapter {str(chapter)}")
-        print(f"Removed chapter {chapter} directory after creating cbz")
+        # print(f"Removed chapter {chapter} directory after creating cbz")
         return "cbz created"
 
 
@@ -320,17 +321,17 @@ class QQCrawler:
             print("Error getting all chapter links")
             return "error"
         chapter_track = 0
-        for i in range(len(chapter_links)):
-            print(f"Getting chapter data from link: {chapter_links[i]}")
+        for i in tqdm.tqdm(range(len(chapter_links)), desc="Processing chapters", unit="chapter"):
+            # print(f"Getting chapter data from link: {chapter_links[i]}")
             chapter_num, img_links = self.get_chapter_data(chapter_links[i])
             # self.get_chapter_images(img_links, i+1)  # i+1 because chapter starts from 1
             # self.create_pdf(i+1, delete_page_0)  # create pdf for each chapter
             self.get_chapter_images(img_links, chapter_num)
             if cbz:
-                print("Creating cbz for chapter ", chapter_num)
+                # print("Creating cbz for chapter ", chapter_num)
                 self.create_cbz(chapter_num, delete_page_0)  # create cbz for each chapter
             else:
-                print("Creating pdf for chapter ", chapter_num)
+                # print("Creating pdf for chapter ", chapter_num)
                 self.create_pdf(chapter_num, delete_page_0)  # create pdf for each chapter
             chapter_track += 1
             time.sleep(3)  # sleep for 5 seconds to avoid being blocked
@@ -347,17 +348,17 @@ class QQCrawler:
             print("Start chapter must be less than end chapter")
             return "error"
         chapter_track = 0
-        for i in range(start_chapter, end_chapter + 1):
-            print(f"Getting chapter {i} data...")
+        for i in tqdm.tqdm(range(start_chapter, end_chapter + 1), desc="Processing chapters", unit="chapter"):
+            # print(f"Getting chapter {i} data...")
             chapter_num, img_links = self.get_chapter_data(i)
             # self.get_chapter_images(img_links, i)
             # self.create_pdf(i, delete_page_0)  # create pdf for each chapter
             self.get_chapter_images(img_links, chapter_num)
             if cbz:
-                print("Creating cbz for chapter ", chapter_num)
+                # print("Creating cbz for chapter ", chapter_num)
                 self.create_cbz(chapter_num, delete_page_0)  # create cbz for each chapter
             else:
-                print("Creating pdf for chapter ", chapter_num)
+                # print("Creating pdf for chapter ", chapter_num)
                 self.create_pdf(chapter_num, delete_page_0)  # create pdf for each
             # self.create_cbz(chapter_num, delete_page_0)  # create cbz for each chapter
             chapter_track += 1
@@ -370,7 +371,7 @@ class QQCrawler:
         """
         Get chapter data
         """
-        print("Argument delete_page_0 of get_chapter: ", delete_page_0)
+        # print("Argument delete_page_0 of get_chapter: ", delete_page_0)
         if isinstance(chapter, int):
             print(f"Getting chapter {chapter} data...")
             chapter_num, img_links = self.get_chapter_data(chapter)

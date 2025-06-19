@@ -2,9 +2,11 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from PIL import Image
+from PIL import ImageFile
+import zipfile
 import os
 import time
-
+import math
 # driver = webdriver.Chrome()
 
 class QQCrawler:
@@ -17,13 +19,22 @@ class QQCrawler:
         self.comic_name = self.get_comic_name()
         self.host = self.referrer
         self.path = os.path.join(os.getcwd(), self.comic_name)
+        if not os.path.exists(self.path):
+            print("Creating comic directory...")
+            os.makedirs(self.path, exist_ok=True)
+            print("Comic directory created: ", self.path)
+        else:
+            print("Comic directory already exists: ", self.path)
         print("Comic directory path: ", self.path)
     
     def get_comic_name(self):
         """
         Get comic name from comic link
         """
-        name = re.search(r'truyen-tranh/(.+?)-\d+', self.comic_link)
+        code = re.findall(r'\d+', self.comic_link)[-1]
+        # name = re.search(r'truyen-tranh/(.+?)-\d+', self.comic_link)
+        # name = name.group(1) if name else "Unknown Comic"
+        name = re.search(r'truyen-tranh/(.+?)-' + code, self.comic_link)
         name = name.group(1) if name else "Unknown Comic"
         return name
     
@@ -65,6 +76,11 @@ class QQCrawler:
         print("Total links: ", len(chapter_links))
         # print(self.chapter_links[0:5])
         # return "chapter links"
+        chapter_links.reverse()  # reverse the order of chapter links
+        time.sleep(0.2)  # sleep for 0.2 seconds to let reverse work properly
+        with open(f"{self.path}/chapter_links.json", "w", encoding="utf-8") as f:
+            import json
+            json.dump(chapter_links, f, ensure_ascii=False, indent=4)
         return chapter_links
 
 
@@ -73,12 +89,33 @@ class QQCrawler:
         if isinstance(chapter, int):
             chapter_link = self.comic_link+"-chap-"+str(chapter)+".html"
             chapter_num = chapter
+        elif isinstance(chapter, float):
+            dec =  str((chapter * 10) % 10)
+            int_chapter = str(math.floor(chapter))
+            chapter_link = self.comic_link+"-chap-"+int_chapter+"-"+dec+".html"
+            chapter_num = int_chapter+"."+dec
         elif isinstance(chapter, str):
             if "https://" in chapter:
                 chapter_link = chapter
             else:
                 chapter_link = self.host + chapter
-            chapter_num = re.search(r'(\d+)', chapter)
+            # if not re.search(r'\d+', chapter).group(2):
+            #     chapter_num = re.search(r'\d+', chapter).group(1)
+            # else:
+            #     chapter_num = re.search(r'\d+', chapter).group(1) + "." + re.search(r'\d+', chapter).group(2)
+
+            # if re.search(r'\d+', chapter).group(2):
+            #     chapter_num = re.search(r'\d+', chapter).group(1) + "." + re.search(r'\d+', chapter).group(2)
+            # else:
+            #     chapter_num = re.search(r'\d+', chapter).group(1)
+            # print("chapter = ", chapter)
+            # print("chapter grp 1 =  ", re.findall(r'\d+', chapter))
+            chap = chapter.split("chap-")
+            if len(re.findall(r'\d+', chap[-1])) < 2:
+                chapter_num = re.findall(r'\d+', chap[-1])[0]
+            else:
+                chapter_num = re.findall(r'\d+', chap[-1])[0] + "." + re.findall(r'\d+', chap[-1])[1]
+
         else:
             print("Chapter must be int or str link")
             return "error"
@@ -112,7 +149,7 @@ class QQCrawler:
         # print("Total links: ", len(response))
         # print(links[0:5])
         # return "chapter img"
-        return img_links
+        return chapter_num, img_links
 
 
     def get_chapter_images(self, img_links, chapter_num): # links_of_img, referer="https://truyenqqgo.com/"
@@ -125,8 +162,10 @@ class QQCrawler:
             'sec-ch-ua-platform' : '"macOS"',
             'user-agent' : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137c.0.0.0 Safari/537.36'
         }
-        
-        for i in range(len(img_links)):
+        i = 0
+        tries = 0
+        # for i in range(len(img_links)):
+        while i < len(img_links):
         # for i in range(6):  # limit to first 6 images for testing
             try:
                 with requests.get(img_links[i], timeout=10, headers=header) as r:
@@ -151,11 +190,31 @@ class QQCrawler:
                             f.write(r.content)
                             fnames.append(str(i)+".jpg")
                         # print("Saved "+str(i)+".jpg")
+                        i += 1
+                        tries = 0
                         time.sleep(0.1)  # sleep for 0.1 seconds to avoid being blocked
                     else:
                         print("Error: ", r.status_code)
+                        print("Trying again...")
+                        tries += 1
+                        if tries >= 5:
+                            print("Too many tries, skipping image...")
+                            with open(f"{self.path}/chapter {chapter_num}/error_log.txt", "a") as f:
+                                f.write(f"Error: {r.status_code} for image {img_links[i]}\n")
+                            i += 1
+                        time.sleep(1)  # sleep for 1 second before trying again
+                        continue
             except Exception as e:
                 print("requests error: ", e)
+                print("Trying again...")
+                tries += 1
+                if tries >= 5:
+                    print("Too many tries, skipping image...")
+                    with open(f"{self.path}/chapter {chapter_num}/error_log.txt", "a") as f:
+                        f.write(f"Error: {e} for image {img_links[i]}\n")
+                    i += 1
+                time.sleep(1)  # sleep for 1 second before trying again
+                continue
         print("Total images saved: ", len(fnames))
         # # return fnames  # return list of filenames
         return "imgs"
@@ -193,9 +252,14 @@ class QQCrawler:
         try:
             imgs = [Image.open(os.path.join(self.path+"/chapter "+str(chapter), i)) for i in fnames]
             print("Total images: ", len(imgs))
+            ImageFile.LOAD_TRUNCATED_IMAGES = True  # allow truncated images
             imgs[0].save(f"{self.path}/chapter {str(chapter)}.pdf", "PDF", save_all=True, append_images=imgs[1:], resolution=100.0) # , quality=95)
             print("Saved chapter "+ str(chapter))
-            os.remove(os.path.join(self.path, f"chapter {chapter}"))  # remove img directory after creating pdf
+            # os.rmdir(f"{self.path}/chapter {str(chapter)}")  # remove img directory after creating pdf
+            import shutil
+
+            # Remove directory and all its contents
+            shutil.rmtree(f"{self.path}/chapter {str(chapter)}")
             print(f"Removed chapter {chapter} directory after creating pdf")
         except Exception as e:
             print("Error creating pdf: ", e)
@@ -203,8 +267,51 @@ class QQCrawler:
         return "pdf created"
 
 
+    def create_cbz(self, chapter, delete_page_0=False):
+        """
+        Create cbz from images
+        """
+        if not os.path.exists(f"{self.path}/chapter {chapter}"):
+            print(f"No images found for chapter {chapter}")
+            return "error"
+        img_ext = [".jpg", ".jpeg", ".png", ".gif"]
+        fnames = [i for i in os.listdir(os.path.join(self.path, f"chapter {chapter}")) if os.path.splitext(i)[1].lower() in img_ext]
+        print("Filenames before sorting: ", fnames)
+        fnames.sort(key=lambda x: int(re.search(r'\d+', x).group()))  # sort by number in filename
+        # if delete_page_0 is True, remove first page
+        print("Sorted filenames: ", fnames)
+        print("argument delete_page_0: ", delete_page_0)
+        if delete_page_0 and len(fnames) > 0:
+            print("Deleting first page...")
+            fnames = fnames[1:]
+        # fnames = fnames[:4]   # limit to first 4 images for testing
+        print("Filenames: ", fnames)
+        if not fnames:
+            print(f"No images found in {self.path}/chapter {chapter}")
+            return "error"
+        # sort filenames
+        print(f"Total: {len(fnames)} images found in chapter {chapter}")
+        if not os.path.exists(self.path+"/chapter "+str(chapter)):
+            print("No img directory found")
+            return "error"
+        # create cbz from images
+        try:
+            with zipfile.ZipFile(f"{self.path}/chapter {str(chapter)}.cbz", "w") as cbz:
+                for img in fnames:
+                    cbz.write(os.path.join(self.path, f"chapter {chapter}", img), img)
+            print("Saved chapter "+ str(chapter))
+        except Exception as e:
+            print("Error creating cbz: ", e)
+            return "error"
+        
+        # remove img directory after creating cbz
+        import shutil
+        shutil.rmtree(f"{self.path}/chapter {str(chapter)}")
+        print(f"Removed chapter {chapter} directory after creating cbz")
+        return "cbz created"
 
-    def get_all_chapter(self, delete_page_0=False):
+
+    def get_all_chapter(self, delete_page_0=False, cbz=True):
         """
         Get all chapter data
         """
@@ -215,9 +322,16 @@ class QQCrawler:
         chapter_track = 0
         for i in range(len(chapter_links)):
             print(f"Getting chapter data from link: {chapter_links[i]}")
-            img_links = self.get_chapter_data(chapter_links[i])
-            self.get_chapter_images(img_links, i+1)  # i+1 because chapter starts from 1
-            self.create_pdf(i+1, delete_page_0)  # create pdf for each chapter
+            chapter_num, img_links = self.get_chapter_data(chapter_links[i])
+            # self.get_chapter_images(img_links, i+1)  # i+1 because chapter starts from 1
+            # self.create_pdf(i+1, delete_page_0)  # create pdf for each chapter
+            self.get_chapter_images(img_links, chapter_num)
+            if cbz:
+                print("Creating cbz for chapter ", chapter_num)
+                self.create_cbz(chapter_num, delete_page_0)  # create cbz for each chapter
+            else:
+                print("Creating pdf for chapter ", chapter_num)
+                self.create_pdf(chapter_num, delete_page_0)  # create pdf for each chapter
             chapter_track += 1
             time.sleep(3)  # sleep for 5 seconds to avoid being blocked
         print(f"Total chapters retrieved: {chapter_track}")
@@ -225,7 +339,7 @@ class QQCrawler:
         return "all chapters"
 
 
-    def get_chapter_from_range(self, start_chapter, end_chapter, delete_page_0=False):
+    def get_chapter_from_range(self, start_chapter, end_chapter, delete_page_0=False, cbz=True):
         """
         Get chapter data from range
         """
@@ -235,31 +349,51 @@ class QQCrawler:
         chapter_track = 0
         for i in range(start_chapter, end_chapter + 1):
             print(f"Getting chapter {i} data...")
-            img_links = self.get_chapter_data(i)
-            self.get_chapter_images(img_links, i)
-            self.create_pdf(i, delete_page_0)  # create pdf for each chapter
+            chapter_num, img_links = self.get_chapter_data(i)
+            # self.get_chapter_images(img_links, i)
+            # self.create_pdf(i, delete_page_0)  # create pdf for each chapter
+            self.get_chapter_images(img_links, chapter_num)
+            if cbz:
+                print("Creating cbz for chapter ", chapter_num)
+                self.create_cbz(chapter_num, delete_page_0)  # create cbz for each chapter
+            else:
+                print("Creating pdf for chapter ", chapter_num)
+                self.create_pdf(chapter_num, delete_page_0)  # create pdf for each
+            # self.create_cbz(chapter_num, delete_page_0)  # create cbz for each chapter
             chapter_track += 1
             time.sleep(3)  # sleep for 5 seconds to avoid being blocked
         print(f"Total chapters retrieved: {chapter_track} / {end_chapter - start_chapter + 1}")
         return "chapter range"
 
     
-    def get_chapter(self, chapter, delete_page_0=False):
+    def get_chapter(self, chapter, delete_page_0=False, cbz=True):
         """
         Get chapter data
         """
         print("Argument delete_page_0 of get_chapter: ", delete_page_0)
         if isinstance(chapter, int):
             print(f"Getting chapter {chapter} data...")
-            img_links = self.get_chapter_data(chapter)
-            self.get_chapter_images(img_links, chapter)
-            self.create_pdf(chapter, delete_page_0)
+            chapter_num, img_links = self.get_chapter_data(chapter)
+            # self.get_chapter_images(img_links, chapter)
+            # self.create_pdf(chapter, delete_page_0)
+            self.get_chapter_images(img_links, chapter_num)
+            # self.create_pdf(chapter_num, delete_page_0)
+            self.create_cbz(chapter_num, delete_page_0)
             return "chapter"
         elif isinstance(chapter, str):
             print(f"Getting chapter data from link: {chapter}")
-            img_links = self.get_chapter_data(chapter)
-            self.get_chapter_images(img_links, chapter)
-            self.create_pdf(chapter, delete_page_0)
+            chapter_num, img_links = self.get_chapter_data(chapter)
+            # self.get_chapter_images(img_links, chapter)
+            # self.create_pdf(chapter, delete_page_0)
+            self.get_chapter_images(img_links, chapter_num)
+            if  cbz:
+                print("Creating cbz for chapter ", chapter_num)
+                self.create_cbz(chapter_num, delete_page_0)  # create cbz for each chapter
+            else:
+                print("Creating pdf for chapter ", chapter_num)
+                self.create_pdf(chapter_num, delete_page_0)
+            # self.create_pdf(chapter_num, delete_page_0)
+            # self.create_cbz(chapter_num, delete_page_0)
             return "chapter link"
         else:
             print("Chapter must be int or str link")
@@ -310,23 +444,27 @@ if __name__ == "__main__":
         action = input("Enter action (get_all_chapter, get_chapter_from_range, get_chapter): ")
         delete_page_0 = input("Delete first page? (y/n): ").strip().lower() == "y"
         print("Delete first page: ", delete_page_0)
+        
         if delete_page_0:
             print("First page WILL be deleted from pdf")
         else:
             print("First page will NOT be deleted from pdf")
+
+        cbz = input("Create cbz instead of pdf? (y/n) (recommend cbz for manga, pdf for non-manga): ").strip().lower() == "y"
+
         if action == "get_all_chapter":
-            control_crawler(crawler, action, delete_page_0)
+            control_crawler(crawler, action, delete_page_0, cbz)
         elif action == "get_chapter_from_range":
             start_chapter = int(input("Enter start chapter: "))
             end_chapter = int(input("Enter end chapter: "))
-            control_crawler(crawler, action, start_chapter, end_chapter, delete_page_0)
+            control_crawler(crawler, action, start_chapter, end_chapter, delete_page_0, cbz)
         elif action == "get_chapter":
             chapter = input("Enter chapter (int or str link): ")
             if chapter.isdigit():
                 chapter = int(chapter)
             else:
                 chapter = str(chapter)
-            control_crawler(crawler, action, chapter, delete_page_0)
+            control_crawler(crawler, action, chapter, delete_page_0, cbz)
         else:
             print("Invalid action")
             continue

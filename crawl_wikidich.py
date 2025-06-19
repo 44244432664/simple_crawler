@@ -718,6 +718,7 @@ class WikiCrawler:
             "num_chapters": num_chapters,
             "description": desc,
             "genres": genres,
+            "novel_url": self.url,
             "start_chapter": start_chapter,
             "end_chapter": end_chapter,
             "chapter_links": [],

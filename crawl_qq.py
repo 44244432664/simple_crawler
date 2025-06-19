@@ -439,34 +439,40 @@ if __name__ == "__main__":
     
     cont = True
     while cont:
-        link = input("Enter comic link: ")
-        crawler = QQCrawler(link)
-        action = input("Enter action (get_all_chapter, get_chapter_from_range, get_chapter): ")
-        delete_page_0 = input("Delete first page? (y/n): ").strip().lower() == "y"
-        print("Delete first page: ", delete_page_0)
-        
-        if delete_page_0:
-            print("First page WILL be deleted from pdf")
-        else:
-            print("First page will NOT be deleted from pdf")
-
-        cbz = input("Create cbz instead of pdf? (y/n) (recommend cbz for manga, pdf for non-manga): ").strip().lower() == "y"
-
-        if action == "get_all_chapter":
-            control_crawler(crawler, action, delete_page_0, cbz)
-        elif action == "get_chapter_from_range":
-            start_chapter = int(input("Enter start chapter: "))
-            end_chapter = int(input("Enter end chapter: "))
-            control_crawler(crawler, action, start_chapter, end_chapter, delete_page_0, cbz)
-        elif action == "get_chapter":
-            chapter = input("Enter chapter (int or str link): ")
-            if chapter.isdigit():
-                chapter = int(chapter)
+        try:
+            print("Welcome to QQ Crawler")
+            link = input("Enter comic link: ")
+            crawler = QQCrawler(link)
+            action = input("Enter action (get_all_chapter, get_chapter_from_range, get_chapter): ")
+            delete_page_0 = input("Delete first page? (y/n): ").strip().lower() == "y"
+            print("Delete first page: ", delete_page_0)
+            
+            if delete_page_0:
+                print("First page WILL be deleted from pdf")
             else:
-                chapter = str(chapter)
-            control_crawler(crawler, action, chapter, delete_page_0, cbz)
-        else:
-            print("Invalid action")
+                print("First page will NOT be deleted from pdf")
+
+            cbz = input("Create cbz instead of pdf? (y/n) (recommend cbz for manga, pdf for non-manga): ").strip().lower() == "y"
+
+            if action == "get_all_chapter":
+                control_crawler(crawler, action, delete_page_0, cbz)
+            elif action == "get_chapter_from_range":
+                start_chapter = int(input("Enter start chapter: "))
+                end_chapter = int(input("Enter end chapter: "))
+                control_crawler(crawler, action, start_chapter, end_chapter, delete_page_0, cbz)
+            elif action == "get_chapter":
+                chapter = input("Enter chapter (int or str link): ")
+                if chapter.isdigit():
+                    chapter = int(chapter)
+                else:
+                    chapter = str(chapter)
+                control_crawler(crawler, action, chapter, delete_page_0, cbz)
+            else:
+                print("Invalid action")
+                continue
+        except Exception as e:
+            print("An error occurred: ", e)
+            print("Please try again.")
             continue
         
         cont = input("Do you want to continue crawling? (y/n): ").strip().lower()=="y"

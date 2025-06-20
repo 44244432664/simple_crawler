@@ -1334,6 +1334,16 @@ class WikiCrawler:
 
         return "show novel info"
     
+    def __book_info_json__(self):
+        if not self.novel_info:
+            print("Novel information not found. Please run get_novel_info() first.")
+            return
+        if not os.path.exists(self.output_dir):
+            print("The output directory does not exist, creating it...")
+            os.makedirs(self.output_dir)
+            print("The novel information is currently emtpy, note that before you export the ebook, or run any function that requires the novel information, you have to run get_novel_info() first.")
+
+        return self.output_dir
 
 def test_novel():
     test_link = "https://wattpad.com.vn/manh-su-tai-thuong-truyen-chu"
@@ -1344,88 +1354,88 @@ def test_novel():
     print(crawler.get_chapter_(test_chapter))
 
             
-def __main__():
-    # test_link = "https://wattpad.com.vn/manh-su-tai-thuong-truyen-chu"
-    # test_chapter = "https://wattpad.com.vn/manh-su-tai-thuong-truyen-chu/chuong-1-pC9X6teJvsJd"
-    # crawler = test()
-    # # print(crawler.get_page_content())
-    # print(crawler.get_novel_info_())
-    # # print(crawler.get_all_chapters_links())
-    # print(crawler.get_chapter(test_chapter))
-    # print(crawler.make_chapter_book(1))
-    # print(crawler.get_chapter(2))
-    # # print(crawler.get_chapter_range(1, 5))
+# def __main__():
+#     # test_link = "https://wattpad.com.vn/manh-su-tai-thuong-truyen-chu"
+#     # test_chapter = "https://wattpad.com.vn/manh-su-tai-thuong-truyen-chu/chuong-1-pC9X6teJvsJd"
+#     # crawler = test()
+#     # # print(crawler.get_page_content())
+#     # print(crawler.get_novel_info_())
+#     # # print(crawler.get_all_chapters_links())
+#     # print(crawler.get_chapter(test_chapter))
+#     # print(crawler.make_chapter_book(1))
+#     # print(crawler.get_chapter(2))
+#     # # print(crawler.get_chapter_range(1, 5))
 
 
-    link = input("Enter the Wattpad/Wikidich novel link: ")
-    output_dir = input("Enter the output directory (default is the novel title of the current directory): ")
-    crawler = WikiCrawler(link, output_dir)
-    crawler.get_novel_info_()
+#     link = input("Enter the Wattpad/Wikidich novel link: ")
+#     output_dir = input("Enter the output directory (default is the novel title of the current directory): ")
+#     crawler = WikiCrawler(link, output_dir)
+#     crawler.get_novel_info_()
 
-    chapter_option = input("""Please select a chapter option:
-- type get_all to get all chapters of the novel
-- type get_chapter to get a specific chapter
-- type get_chapter_range to get a range of chapters
-- type exit to exit the program
-Enter your choice: """)
+#     chapter_option = input("""Please select a chapter option:
+# - type get_all to get all chapters of the novel
+# - type get_chapter to get a specific chapter
+# - type get_chapter_range to get a range of chapters
+# - type exit to exit the program
+# Enter your choice: """)
     
-    if chapter_option == "get_all":
-        # print(crawler.get_all_chapters())
-        crawler.get_all_chapters()
-    elif chapter_option == "get_chapter":
-        chapter = input("Enter the chapter number or URL: ")
-        crawler.get_chapter(chapter)
-    elif chapter_option == "get_chapter_range":
-        start = input("Enter the start chapter number or URL: ")
-        end = input("Enter the end chapter number or URL: ")
-        crawler.get_chapter_range(start, end)
-    elif chapter_option == "exit":
-        print("Exiting the program.")
-        return
+#     if chapter_option == "get_all":
+#         # print(crawler.get_all_chapters())
+#         crawler.get_all_chapters()
+#     elif chapter_option == "get_chapter":
+#         chapter = input("Enter the chapter number or URL: ")
+#         crawler.get_chapter(chapter)
+#     elif chapter_option == "get_chapter_range":
+#         start = input("Enter the start chapter number or URL: ")
+#         end = input("Enter the end chapter number or URL: ")
+#         crawler.get_chapter_range(start, end)
+#     elif chapter_option == "exit":
+#         print("Exiting the program.")
+#         return
     
-    show_info_option = input(f"Do you want to show the novel information? (y/n): ")
-    if show_info_option.lower() == 'y':
-        crawler.show_novel_info()
-    else:
-        print(f"You can always look for full info in the file {crawler.output_dir}/novel_info.json")
+#     show_info_option = input(f"Do you want to show the novel information? (y/n): ")
+#     if show_info_option.lower() == 'y':
+#         crawler.show_novel_info()
+#     else:
+#         print(f"You can always look for full info in the file {crawler.output_dir}/novel_info.json")
 
-    make_book_option = input("""How do you want to save the chapters?
-1. Save as individual chapter books
-2. Save as a single book with chapters stored in the novel_info.json file of output directory (you have to have the chapters content in the novel_info.json file)
-3. Exit (Note that the chapters you crawled will still be saved in the novel_info.json file for later use)
-Enter your choice (1/2/3): """)
-    if make_book_option == "1":
-        if chapter_option == "get_all":
-            for i in range(1, crawler.novel_info["num_chapters"] + 1):
-                # crawler.make_chapter_book(i)
-                create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[i])
-        elif chapter_option == "get_chapter":
-            # crawler.make_chapter_book(chapter)
-            create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[chapter])
-        elif chapter_option == "get_chapter_range":
-            for i in range(int(start), int(end) + 1):
-                # crawler.make_chapter_book(i)
-                create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[i])
-    elif make_book_option == "2":
-        # crawler.make_all_book()
-        if chapter_option == "get_all":
-            create_epub(crawler.novel_info, crawler.output_dir)
-        elif chapter_option == "get_chapter":
-            create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[chapter])
-        elif chapter_option == "get_chapter_range":
-            create_epub(crawler.novel_info, crawler.output_dir, chapter_num=(int(start), int(end)))
-    elif make_book_option == "3":
-        print("Exiting the program.")
-        return
-    else:
-        print("Invalid option. Exiting the program.")
-        return
+#     make_book_option = input("""How do you want to save the chapters?
+# 1. Save as individual chapter books
+# 2. Save as a single book with chapters stored in the novel_info.json file of output directory (you have to have the chapters content in the novel_info.json file)
+# 3. Exit (Note that the chapters you crawled will still be saved in the novel_info.json file for later use)
+# Enter your choice (1/2/3): """)
+#     if make_book_option == "1":
+#         if chapter_option == "get_all":
+#             for i in range(1, crawler.novel_info["num_chapters"] + 1):
+#                 # crawler.make_chapter_book(i)
+#                 create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[i])
+#         elif chapter_option == "get_chapter":
+#             # crawler.make_chapter_book(chapter)
+#             create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[chapter])
+#         elif chapter_option == "get_chapter_range":
+#             for i in range(int(start), int(end) + 1):
+#                 # crawler.make_chapter_book(i)
+#                 create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[i])
+#     elif make_book_option == "2":
+#         # crawler.make_all_book()
+#         if chapter_option == "get_all":
+#             create_epub(crawler.novel_info, crawler.output_dir)
+#         elif chapter_option == "get_chapter":
+#             create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[chapter])
+#         elif chapter_option == "get_chapter_range":
+#             create_epub(crawler.novel_info, crawler.output_dir, chapter_num=(int(start), int(end)))
+#     elif make_book_option == "3":
+#         print("Exiting the program.")
+#         return
+#     else:
+#         print("Invalid option. Exiting the program.")
+#         return
 
-    print("Operation completed successfully.")
+#     print("Operation completed successfully.")
     
  
     
     
-if __name__ == "__main__":
-    __main__()
-    # test_novel()
+# if __name__ == "__main__":
+#     __main__()
+#     # test_novel()

@@ -1,3 +1,8 @@
+<h1>The repo is temporary stop working</h1>
+<p>If you see this message, I'm currently improving the file organization, so the nothing will work.</p>
+And no, I don't think there are many would pay attention to my repo, I would go the easy way and update on main
+<i>muahahahahaha</i>
+
 Project to download and make comic from 2 sites that lncrawler has not crawl yet: Truyenqq and Wikidich (also works for Wattpad at the current time since Wikidich is kind of copy Wattpad, just change the name and color). Yes, I know, I can just create a bot in lncrawl for Wikidich, but the thing is, I am stupid, so I have to do the hard way :>>>.
 - To use terminal interface, just run the 
 ```python crawl_qq.py```

@@ -627,7 +627,7 @@ class WikiCrawler:
         # "https://wattpad.com.vn"
         self.title = self.get_title_from_link()
         # "manh su tai thuong"
-        self.output_dir = f"{self.title}" if output_dir == "" else output_dir
+        self.output_dir = f"outputs/{self.title}" if output_dir == "" else output_dir
         self.novel_info = {
             "title": None,
             "author": None,

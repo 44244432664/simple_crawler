@@ -19,7 +19,7 @@ class QQCrawler:
         # self.referrer = "https://truyenqqgo.com/"
         self.comic_name = self.get_comic_name()
         self.host = self.referrer
-        self.path = os.path.join(os.getcwd(), self.comic_name)
+        self.path = os.path.join(os.getcwd(), "outputs", self.comic_name)
         if not os.path.exists(self.path):
             print("Creating comic directory...")
             os.makedirs(self.path, exist_ok=True)

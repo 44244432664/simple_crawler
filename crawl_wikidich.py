@@ -14,6 +14,7 @@ from selenium.webdriver.common.keys import Keys
 from ebooklib import epub
 
 from epub_style import epub_style_css, epub_cover_xhtml, epub_chapter_xhtml
+from ebook.epub import create_epub
 
 class test:
     def __init__(self):
@@ -683,12 +684,13 @@ class WikiCrawler:
         # author = web.find_element(By.XPATH, "//a[@itemprop='author']").text
         book_info = soup.find("div", class_="book-info")
         cover_image_link = book_info.find("img", itemprop="image").get("src")
+        ext =  cover_image_link.split(".")[-1]
         try:
             with requests.get(self.base_url+cover_image_link) as response:
                 if response.status_code == 200:
-                    with open(f"{self.output_dir}/cover.jpg", "wb") as file:
+                    with open(f"{self.output_dir}/cover.{ext}", "wb") as file:
                         file.write(response.content)
-                    cover_image = f"{self.output_dir}/cover.jpg"
+                    cover_image = f"{self.output_dir}/cover.{ext}"
                 else:
                     print(f"Failed to retrieve cover image, status code: {response.status_code}")
                     cover_image = None
@@ -1052,264 +1054,264 @@ class WikiCrawler:
         return "get chapter range"
                 
         
-    def make_chapter_book(self, chapter):
-        if isinstance(chapter, str):
-            if not chapter.startswith("http"):
-                chapter = self.base_url + chapter
-            chapter_index = self.novel_info["chapter_links"].index(chapter) + 1
-        elif isinstance(chapter, str) and chapter.isdigit():
-            chapter_index = int(chapter)
-        elif isinstance(chapter, int):
-            chapter_index = chapter
-        for e in self.novel_info["chapters"]:
-            if e["index"] == chapter_index:
-                chapter_data = e
-                break
-        else:
-            chapter_data = self.get_chapter(chapter)
-        chap = epub.EpubBook()
-        chap.set_identifier(f'{self.novel_info["title"].replace(" ", "_")}-chap_{chapter_data["index"]}')
-        chap.set_language('vi')
-        # chap.set_title(f"{self.novel_info['title']} - {chapter_data['title'] if re.match(r'^Chương \d+', chapter_data['title']) else ('Chương ' + str(chapter_data['index']) + ': ' + chapter_data['title'])}")
-        if re.match(r'^Chương \d+', chapter_data['title']):
-            chap.set_title(f"{self.novel_info['title']} - {chapter_data['title']}")
-        else:
-            chap.set_title(f"Chương {chapter_data['index']}: {chapter_data['title']}")
+    # def make_chapter_book(self, chapter):
+    #     if isinstance(chapter, str):
+    #         if not chapter.startswith("http"):
+    #             chapter = self.base_url + chapter
+    #         chapter_index = self.novel_info["chapter_links"].index(chapter) + 1
+    #     elif isinstance(chapter, str) and chapter.isdigit():
+    #         chapter_index = int(chapter)
+    #     elif isinstance(chapter, int):
+    #         chapter_index = chapter
+    #     for e in self.novel_info["chapters"]:
+    #         if e["index"] == chapter_index:
+    #             chapter_data = e
+    #             break
+    #     else:
+    #         chapter_data = self.get_chapter(chapter)
+    #     chap = epub.EpubBook()
+    #     chap.set_identifier(f'{self.novel_info["title"].replace(" ", "_")}-chap_{chapter_data["index"]}')
+    #     chap.set_language('vi')
+    #     # chap.set_title(f"{self.novel_info['title']} - {chapter_data['title'] if re.match(r'^Chương \d+', chapter_data['title']) else ('Chương ' + str(chapter_data['index']) + ': ' + chapter_data['title'])}")
+    #     if re.match(r'^Chương \d+', chapter_data['title']):
+    #         chap.set_title(f"{self.novel_info['title']} - {chapter_data['title']}")
+    #     else:
+    #         chap.set_title(f"Chương {chapter_data['index']}: {chapter_data['title']}")
         
-        chap.add_author(self.novel_info["author"])
-        if "description" in self.novel_info:
-            chap.add_metadata("DC", "description", self.novel_info["description"])
-        # for genre in self.novel_info["genres"]:
-        #     chap.add_metadata("DC", "subject", genre)
-        # chap.set_cover("cover.jpg", open(f"{self.output_dir}/cover.jpg", "rb").read())
-        # Add cover image
+    #     chap.add_author(self.novel_info["author"])
+    #     if "description" in self.novel_info:
+    #         chap.add_metadata("DC", "description", self.novel_info["description"])
+    #     # for genre in self.novel_info["genres"]:
+    #     #     chap.add_metadata("DC", "subject", genre)
+    #     # chap.set_cover("cover.jpg", open(f"{self.output_dir}/cover.jpg", "rb").read())
+    #     # Add cover image
 
-        style = epub.EpubItem(
-            file_name="style.css",
-            media_type="text/css",
-            content=epub_style_css()
-        )
-        chap.add_item(style)
-        chap.set_template("cover", epub_cover_xhtml())
-        chap.set_template("chapter", epub_chapter_xhtml())
+    #     style = epub.EpubItem(
+    #         file_name="style.css",
+    #         media_type="text/css",
+    #         content=epub_style_css()
+    #     )
+    #     chap.add_item(style)
+    #     chap.set_template("cover", epub_cover_xhtml())
+    #     chap.set_template("chapter", epub_chapter_xhtml())
         
-        # Add cover image
-        toc = []
-        spine = []
+    #     # Add cover image
+    #     toc = []
+    #     spine = []
 
-        if self.novel_info["cover_image"]:
-            with open(f"{self.output_dir}/cover.jpg", "rb") as cover_file:
-                cover_content = cover_file.read()
-                chap.set_cover("cover.jpg", cover_content, create_page=True)
+    #     if self.novel_info["cover_image"]:
+    #         with open(f"{self.output_dir}/cover.jpg", "rb") as cover_file:
+    #             cover_content = cover_file.read()
+    #             chap.set_cover("cover.jpg", cover_content, create_page=True)
             
-            spine.append("cover")
+    #         spine.append("cover")
 
-            cover_item = epub.EpubHtml(
-                uid="cover",
-                file_name="cover.jpg",
-                media_type="image/jpeg",
-                content=f"""
-                <div id="cover">
-                    <img src="cover.jpg" alt="Cover Image" />
-                </div>
-                """
-            )
+    #         cover_item = epub.EpubHtml(
+    #             uid="cover",
+    #             file_name="cover.jpg",
+    #             media_type="image/jpeg",
+    #             content=f"""
+    #             <div id="cover">
+    #                 <img src="cover.jpg" alt="Cover Image" />
+    #             </div>
+    #             """
+    #         )
 
-            cover_item.add_link(
-                href="style.css",
-                rel="stylesheet",
-                type="text/css",
-                )
+    #         cover_item.add_link(
+    #             href="style.css",
+    #             rel="stylesheet",
+    #             type="text/css",
+    #             )
             
-        chap.add_item(cover_item)
-        spine.append(cover_item)
-        toc.append(epub.Link("cover.jpg", "Bìa sách", "cover"))
+    #     chap.add_item(cover_item)
+    #     spine.append(cover_item)
+    #     toc.append(epub.Link("cover.jpg", "Bìa sách", "cover"))
         
-        # Add introduction  
-        # <p>Thể loại: {', '.join(self.novel_info['genres']) if self.novel_info['genres'] else 'Khác'}</p>
-        intro = epub.EpubHtml(
-            title=f"Giới thiệu nội dung",
-            file_name="intro.xhtml",
-            lang='vi',
-            content=f"""
-            <h1>{self.novel_info['title']}</h1>
-            <p>Tác giả: {self.novel_info['author']}</p>
-            <p>Số chương: {self.novel_info['num_chapters']}</p>
-            <p>Mô tả: {self.novel_info['description'] if 'description' in self.novel_info else '<p>Không có mô tả</p>'}</p>
-            <p>Link truyện: <a href="{self.novel_info['novel_url']}">{self.novel_info['novel_url']}</a></p>
+    #     # Add introduction  
+    #     # <p>Thể loại: {', '.join(self.novel_info['genres']) if self.novel_info['genres'] else 'Khác'}</p>
+    #     intro = epub.EpubHtml(
+    #         title=f"Giới thiệu nội dung",
+    #         file_name="intro.xhtml",
+    #         lang='vi',
+    #         content=f"""
+    #         <h1>{self.novel_info['title']}</h1>
+    #         <p>Tác giả: {self.novel_info['author']}</p>
+    #         <p>Số chương: {self.novel_info['num_chapters']}</p>
+    #         <p>Mô tả: {self.novel_info['description'] if 'description' in self.novel_info else '<p>Không có mô tả</p>'}</p>
+    #         <p>Link truyện: <a href="{self.novel_info['novel_url']}">{self.novel_info['novel_url']}</a></p>
             
-            <p>This project is inspired and copy style from lncrawler project by <a href="https://github.com/dipu-bd/lightnovel-crawler">dipu-bd/lightnovel-crawler</a>.</p>
-            <p><i>Generated by WikiCrawler of Nguyen Hai Dang</i></p>
-            """
-            # <p>Cover image: <img src="{self.novel_info['cover_image']}" alt="Cover Image" /></p>
-        )
+    #         <p>This project is inspired and copy style from lncrawler project by <a href="https://github.com/dipu-bd/lightnovel-crawler">dipu-bd/lightnovel-crawler</a>.</p>
+    #         <p><i>Generated by WikiCrawler of Nguyen Hai Dang</i></p>
+    #         """
+    #         # <p>Cover image: <img src="{self.novel_info['cover_image']}" alt="Cover Image" /></p>
+    #     )
 
-        intro.add_link(
-            href="style.css",  
-            rel="stylesheet",
-            type="text/css",
-        )
+    #     intro.add_link(
+    #         href="style.css",  
+    #         rel="stylesheet",
+    #         type="text/css",
+    #     )
 
-        chap.add_item(intro)
-        toc.append(intro)
-        spine.append(intro)
-        spine.append("nav")
+    #     chap.add_item(intro)
+    #     toc.append(intro)
+    #     spine.append(intro)
+    #     spine.append("nav")
         
-        c = epub.EpubHtml(
-            title=chapter_data["title"],
-            file_name=f"chap_{chapter_data['index']}.xhtml",
-            lang='vi',
-            content=f"{chapter_data['content']}"
-        )
-        c.add_link(
-            href=style.file_name,
-            rel="stylesheet",
-            type="text/css",
-        )
-        chap.add_item(c)
-        toc.append(c)
-        spine.append(c)
+    #     c = epub.EpubHtml(
+    #         title=chapter_data["title"],
+    #         file_name=f"chap_{chapter_data['index']}.xhtml",
+    #         lang='vi',
+    #         content=f"{chapter_data['content']}"
+    #     )
+    #     c.add_link(
+    #         href=style.file_name,
+    #         rel="stylesheet",
+    #         type="text/css",
+    #     )
+    #     chap.add_item(c)
+    #     toc.append(c)
+    #     spine.append(c)
         
-        chap.toc = toc
-        chap.spine = spine
+    #     chap.toc = toc
+    #     chap.spine = spine
         
-        chap.add_item(epub.EpubNcx())
-        chap.add_item(epub.EpubNav())
+    #     chap.add_item(epub.EpubNcx())
+    #     chap.add_item(epub.EpubNav())
         
-        epub.write_epub(f"{self.output_dir}/{self.novel_info['title']}_chap_{chapter_data['index']}.epub", chap, {})
-        print(f"Chapter {chapter_data['index']} book created successfully.")
-        return "make epub chapter"
+    #     epub.write_epub(f"{self.output_dir}/{self.novel_info['title']}_chap_{chapter_data['index']}.epub", chap, {})
+    #     print(f"Chapter {chapter_data['index']} book created successfully.")
+    #     return "make epub chapter"
     
     
-    def make_all_book(self):
-        book = epub.EpubBook()
-        book.set_identifier(f'{self.novel_info["title"].replace(" ", "_")}-all_chapter')
-        book.set_title(self.novel_info["title"])
-        book.set_language('vi')
-        # book.set_cover("cover.jpg", open(f"{self.output_dir}/cover.jpg", "rb").read())
-        book.add_author(self.novel_info["author"])
-        book.add_metadata("DC", "description", self.novel_info["description"] if "description" in self.novel_info else "<p>Không có mô tả</p>")
-        # for genre in self.novel_info["genres"]:
-        #     book.add_metadata("DC", "subject", genre)
+    # def make_all_book(self):
+    #     book = epub.EpubBook()
+    #     book.set_identifier(f'{self.novel_info["title"].replace(" ", "_")}-all_chapter')
+    #     book.set_title(self.novel_info["title"])
+    #     book.set_language('vi')
+    #     # book.set_cover("cover.jpg", open(f"{self.output_dir}/cover.jpg", "rb").read())
+    #     book.add_author(self.novel_info["author"])
+    #     book.add_metadata("DC", "description", self.novel_info["description"] if "description" in self.novel_info else "<p>Không có mô tả</p>")
+    #     for genre in self.novel_info["genres"]:
+    #         book.add_metadata("DC", "subject", genre)
         
-        style = epub.EpubItem(
-            file_name="style.css",
-            media_type="text/css",
-            content=epub_style_css()
-        )
+    #     style = epub.EpubItem(
+    #         file_name="style.css",
+    #         media_type="text/css",
+    #         content=epub_style_css()
+    #     )
         
-        book.add_item(style)
+    #     book.add_item(style)
         
-        book.set_template("cover", epub_cover_xhtml())
-        book.set_template("chapter", epub_chapter_xhtml())
+    #     book.set_template("cover", epub_cover_xhtml())
+    #     book.set_template("chapter", epub_chapter_xhtml())
 
-        toc = []
-        spine = []
+    #     toc = []
+    #     spine = []
 
-        if self.novel_info["cover_image"]:
-            with open(f"{self.output_dir}/cover.jpg", "rb") as cover_file:
-                cover_content = cover_file.read()
-                book.set_cover("cover.jpg", cover_content, create_page=True)
+    #     if self.novel_info["cover_image"]:
+    #         with open(f"{self.output_dir}/cover.jpg", "rb") as cover_file:
+    #             cover_content = cover_file.read()
+    #             book.set_cover("cover.jpg", cover_content, create_page=True)
             
-            spine.append("cover")
+    #         spine.append("cover")
 
-            cover_item = epub.EpubHtml(
-                uid="cover",
-                file_name="cover.jpg",
-                media_type="image/jpeg",
-                content=f"""
-                <div id="cover">
-                    <img src="cover.jpg" alt="Cover Image" />
-                </div>
-                """
-            )
+    #         cover_item = epub.EpubHtml(
+    #             uid="cover",
+    #             file_name="cover.jpg",
+    #             media_type="image/jpeg",
+    #             content=f"""
+    #             <div id="cover">
+    #                 <img src="cover.jpg" alt="Cover Image" />
+    #             </div>
+    #             """
+    #         )
 
-            cover_item.add_link(
-                href="style.css",
-                rel="stylesheet",
-                type="text/css",
-                )
+    #         cover_item.add_link(
+    #             href="style.css",
+    #             rel="stylesheet",
+    #             type="text/css",
+    #             )
             
-        book.add_item(cover_item)
-        spine.append(cover_item)
-        toc.append(epub.Link("cover.jpg", "Bìa sách", "cover"))
+    #     book.add_item(cover_item)
+    #     spine.append(cover_item)
+    #     toc.append(epub.Link("cover.jpg", "Bìa sách", "cover"))
         
-        # Add introduction
-        intro = epub.EpubHtml(
-            title=f"Giới thiệu nội dung",
-            file_name="intro.xhtml",
-            # lang='vi',
-            # <p>Thể loại: {', '.join(self.novel_info['genres']) if self.novel_info['genres'] else 'Khác'}</p>
-            content=f"""
-            <h1>{self.novel_info['title']}</h1>
-            <p>Tác giả: {self.novel_info['author']}</p>
+    #     # Add introduction
+    #     intro = epub.EpubHtml(
+    #         title=f"Giới thiệu nội dung",
+    #         file_name="intro.xhtml",
+    #         # lang='vi',
+    #         # <p>Thể loại: {', '.join(self.novel_info['genres']) if self.novel_info['genres'] else 'Khác'}</p>
+    #         content=f"""
+    #         <h1>{self.novel_info['title']}</h1>
+    #         <p>Tác giả: {self.novel_info['author']}</p>
             
-            <p>Số chương: {self.novel_info['num_chapters']}</p>
-            <p>Mô tả: {self.novel_info['description'] if 'description' in self.novel_info else '<p>Không có mô tả</p>'}</p>
-            <p>Link truyện: <a href="{self.url}">{self.url}</a></p>
+    #         <p>Số chương: {self.novel_info['num_chapters']}</p>
+    #         <p>Mô tả: {self.novel_info['description'] if 'description' in self.novel_info else '<p>Không có mô tả</p>'}</p>
+    #         <p>Link truyện: <a href="{self.url}">{self.url}</a></p>
             
-            <p>This project is inspired and copy style from <b>lncrawler</b> project by <a href="https://github.com/dipu-bd/lightnovel-crawler">dipu-bd/lightnovel-crawler</a>.</p>
-            <p>If you like this project, please give some time to visit the original project.</p>
-            <p><i>Generated by WikiCrawler of Nguyen Hai Dang</i></p>
+    #         <p>This project is inspired and copy style from <b>lncrawler</b> project by <a href="https://github.com/dipu-bd/lightnovel-crawler">dipu-bd/lightnovel-crawler</a>.</p>
+    #         <p>If you like this project, please give some time to visit the original project.</p>
+    #         <p><i>Generated by WikiCrawler of Nguyen Hai Dang</i></p>
             
-            """
-            # <p>Cover image: <img src="{self.novel_info['cover_image']}" alt="Cover Image" /></p>
-        )
-        intro.add_link(
-        href="style.css",
-        rel="stylesheet",
-        type="text/css",
-        )
-        book.add_item(intro)
-        toc.append(intro)
-        spine.append(intro)
+    #         """
+    #         # <p>Cover image: <img src="{self.novel_info['cover_image']}" alt="Cover Image" /></p>
+    #     )
+    #     intro.add_link(
+    #     href="style.css",
+    #     rel="stylesheet",
+    #     type="text/css",
+    #     )
+    #     book.add_item(intro)
+    #     toc.append(intro)
+    #     spine.append(intro)
         
-        if self.novel_info["num_chapters"] <= 100:
-            spine.append("nav")
+    #     if self.novel_info["num_chapters"] <= 100:
+    #         spine.append("nav")
         
-        # Add chapters
-        # for chapter in self.novel_info["chapters"]:
-        #     chapter_title = chapter["title"].replace(" ", "_").replace("/", "-")
-        #     c = epub.EpubHtml(title=chapter_title, file_name=f"{chapter_title}.xhtml", lang='vi')
-        #     c.content = f"<h1>{chapter['title']}</h1><p>{chapter['content']}</p>"
-        #     book.add_item(c)
-        #     book.toc.append(c)
+    #     # Add chapters
+    #     # for chapter in self.novel_info["chapters"]:
+    #     #     chapter_title = chapter["title"].replace(" ", "_").replace("/", "-")
+    #     #     c = epub.EpubHtml(title=chapter_title, file_name=f"{chapter_title}.xhtml", lang='vi')
+    #     #     c.content = f"<h1>{chapter['title']}</h1><p>{chapter['content']}</p>"
+    #     #     book.add_item(c)
+    #     #     book.toc.append(c)
         
-        for i in tqdm.tqdm(range(1, len(self.novel_info["chapters"]) + 1), desc="Processing chapters", unit="chapter"):
-            chapter = self.novel_info["chapters"][i - 1]
-            c = epub.EpubHtml(
-                title=chapter["title"],
-                file_name=f"chap_{chapter['index']}.xhtml",
-                # lang='vi',
-                content=f"""
-                <div class="chapter" id="chapter-{chapter['index']}">
-                    <h1>{chapter['title'] if 'Chương' in chapter['title'] else 'Chương ' + str(chapter['index']) + ': ' + chapter['title']}</h1>
-                </div>
-                {chapter['content']}
-                """,
-            )
+    #     for i in tqdm.tqdm(range(1, len(self.novel_info["chapters"]) + 1), desc="Processing chapters", unit="chapter"):
+    #         chapter = self.novel_info["chapters"][i - 1]
+    #         c = epub.EpubHtml(
+    #             title=chapter["title"],
+    #             file_name=f"chap_{chapter['index']}.xhtml",
+    #             # lang='vi',
+    #             content=f"""
+    #             <div class="chapter" id="chapter-{chapter['index']}">
+    #                 <h1>{chapter['title'] if 'Chương' in chapter['title'] else 'Chương ' + str(chapter['index']) + ': ' + chapter['title']}</h1>
+    #             </div>
+    #             {chapter['content']}
+    #             """,
+    #         )
 
-            c.add_link(
-                href=style.file_name,
-                rel="stylesheet",
-                type="text/css",
-            )
+    #         c.add_link(
+    #             href=style.file_name,
+    #             rel="stylesheet",
+    #             type="text/css",
+    #         )
 
-            book.add_item(c)
-            toc.append(c)
-            spine.append(c)
+    #         book.add_item(c)
+    #         toc.append(c)
+    #         spine.append(c)
         
-        book.toc = toc
-        book.spine = spine
+    #     book.toc = toc
+    #     book.spine = spine
         
-        # Add navigation files
-        book.add_item(epub.EpubNcx())
-        book.add_item(epub.EpubNav())
+    #     # Add navigation files
+    #     book.add_item(epub.EpubNcx())
+    #     book.add_item(epub.EpubNav())
         
-        # Save the epub file
-        epub.write_epub(f"{self.output_dir}/{self.novel_info['title']}.epub", book, {})
+    #     # Save the epub file
+    #     epub.write_epub(f"{self.output_dir}/{self.novel_info['title']}.epub", book, {})
         
-        print(f"Epub file '{self.novel_info['title']}.epub' created successfully.")
+    #     print(f"Epub file '{self.novel_info['title']}.epub' created successfully.")
 
 
     def show_novel_info(self):
@@ -1389,20 +1391,29 @@ Enter your choice: """)
 
     make_book_option = input("""How do you want to save the chapters?
 1. Save as individual chapter books
-2. Save as a single book with all stored chapters in the novel_info.json file of output directory (if you want to save all chapters, pls first save all chapters into the novel_info.json file)
-3. Exit (Note that the chapters will still be saved in the novel_info.json file for later use)
+2. Save as a single book with chapters stored in the novel_info.json file of output directory (you have to have the chapters content in the novel_info.json file)
+3. Exit (Note that the chapters you crawled will still be saved in the novel_info.json file for later use)
 Enter your choice (1/2/3): """)
     if make_book_option == "1":
         if chapter_option == "get_all":
             for i in range(1, crawler.novel_info["num_chapters"] + 1):
-                crawler.make_chapter_book(i)
+                # crawler.make_chapter_book(i)
+                create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[i])
         elif chapter_option == "get_chapter":
-            crawler.make_chapter_book(chapter)
+            # crawler.make_chapter_book(chapter)
+            create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[chapter])
         elif chapter_option == "get_chapter_range":
             for i in range(int(start), int(end) + 1):
-                crawler.make_chapter_book(i)
+                # crawler.make_chapter_book(i)
+                create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[i])
     elif make_book_option == "2":
-        crawler.make_all_book()
+        # crawler.make_all_book()
+        if chapter_option == "get_all":
+            create_epub(crawler.novel_info, crawler.output_dir)
+        elif chapter_option == "get_chapter":
+            create_epub(crawler.novel_info, crawler.output_dir, chapter_num=[chapter])
+        elif chapter_option == "get_chapter_range":
+            create_epub(crawler.novel_info, crawler.output_dir, chapter_num=(int(start), int(end)))
     elif make_book_option == "3":
         print("Exiting the program.")
         return

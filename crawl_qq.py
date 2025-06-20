@@ -221,51 +221,51 @@ class QQCrawler:
         return "imgs"
 
     
-    def create_pdf(self, chapter, delete_page_0=False):
-        """
-        Create pdf from images
-        """
-        if not os.path.exists(f"{self.path}/chapter {chapter}"):
-            print(f"No images found for chapter {chapter}")
-            # print("No images found")
-            return "error"
-        img_ext = [".jpg", ".jpeg", ".png", ".gif"]
-        fnames = [i for i in os.listdir(os.path.join(self.path, f"chapter {chapter}")) if os.path.splitext(i)[1].lower() in img_ext]
-        # print("Filenames before sorting: ", fnames)
-        fnames.sort(key=lambda x: int(re.search(r'\d+', x).group()))  # sort by number in filename
-        # if delete_page_0 is True, remove first page
-        # print("Sorted filenames: ", fnames)
-        # print("argument delete_page_0: ", delete_page_0)
-        if delete_page_0 and len(fnames) > 0:
-            # print("Deleting first page...")
-            fnames = fnames[1:]  # remove first page
-        # fnames = fnames[:4]   # limit to first 4 images for testing
-        # print("Filenames: ", fnames)
-        if not fnames:
-            print(f"No images found in {self.path}/chapter {chapter}")
-            return "error"
-        # sort filenames
-        # print(f"Total: {len(fnames)} images found in chapter {chapter}")
-        if not os.path.exists(self.path+"/chapter "+str(chapter)):
-            print("No img directory found")
-            return "error"
-        # create pdf from images
-        try:
-            imgs = [Image.open(os.path.join(self.path+"/chapter "+str(chapter), i)) for i in fnames]
-            # print("Total images: ", len(imgs))
-            ImageFile.LOAD_TRUNCATED_IMAGES = True  # allow truncated images
-            imgs[0].save(f"{self.path}/chapter {str(chapter)}.pdf", "PDF", save_all=True, append_images=imgs[1:], resolution=100.0) # , quality=95)
-            # print("Saved chapter "+ str(chapter))
-            # os.rmdir(f"{self.path}/chapter {str(chapter)}")  # remove img directory after creating pdf
-            import shutil
+    # def create_pdf(self, chapter, delete_page_0=False):
+    #     """
+    #     Create pdf from images
+    #     """
+    #     if not os.path.exists(f"{self.path}/chapter {chapter}"):
+    #         print(f"No images found for chapter {chapter}")
+    #         # print("No images found")
+    #         return "error"
+    #     img_ext = [".jpg", ".jpeg", ".png", ".gif"]
+    #     fnames = [i for i in os.listdir(os.path.join(self.path, f"chapter {chapter}")) if os.path.splitext(i)[1].lower() in img_ext]
+    #     # print("Filenames before sorting: ", fnames)
+    #     fnames.sort(key=lambda x: int(re.search(r'\d+', x).group()))  # sort by number in filename
+    #     # if delete_page_0 is True, remove first page
+    #     # print("Sorted filenames: ", fnames)
+    #     # print("argument delete_page_0: ", delete_page_0)
+    #     if delete_page_0 and len(fnames) > 0:
+    #         # print("Deleting first page...")
+    #         fnames = fnames[1:]  # remove first page
+    #     # fnames = fnames[:4]   # limit to first 4 images for testing
+    #     # print("Filenames: ", fnames)
+    #     if not fnames:
+    #         print(f"No images found in {self.path}/chapter {chapter}")
+    #         return "error"
+    #     # sort filenames
+    #     # print(f"Total: {len(fnames)} images found in chapter {chapter}")
+    #     if not os.path.exists(self.path+"/chapter "+str(chapter)):
+    #         print("No img directory found")
+    #         return "error"
+    #     # create pdf from images
+    #     try:
+    #         imgs = [Image.open(os.path.join(self.path+"/chapter "+str(chapter), i)) for i in fnames]
+    #         # print("Total images: ", len(imgs))
+    #         ImageFile.LOAD_TRUNCATED_IMAGES = True  # allow truncated images
+    #         imgs[0].save(f"{self.path}/chapter {str(chapter)}.pdf", "PDF", save_all=True, append_images=imgs[1:], resolution=100.0) # , quality=95)
+    #         # print("Saved chapter "+ str(chapter))
+    #         # os.rmdir(f"{self.path}/chapter {str(chapter)}")  # remove img directory after creating pdf
+    #         import shutil
 
-            # Remove directory and all its contents
-            shutil.rmtree(f"{self.path}/chapter {str(chapter)}")
-            # print(f"Removed chapter {chapter} directory after creating pdf")
-        except Exception as e:
-            print("Error creating pdf: ", e)
-            return "error"
-        return "pdf created"
+    #         # Remove directory and all its contents
+    #         shutil.rmtree(f"{self.path}/chapter {str(chapter)}")
+    #         # print(f"Removed chapter {chapter} directory after creating pdf")
+    #     except Exception as e:
+    #         print("Error creating pdf: ", e)
+    #         return "error"
+    #     return "pdf created"
 
 
     def create_cbz(self, chapter, delete_page_0=False):

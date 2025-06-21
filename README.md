@@ -7,4 +7,4 @@ Yes, it is goes through a lot of if else, I will try to make it better if I stil
 
 \* If you need an emergency project to store the comics or novels that you love which might be gone in some near future and you do not have the money to buy the whole comic or the country just does not import the comic, hope you enjoy this project before finding a better one :3
 
-- <u>Note</u>: I will add the cbz to pdf converter for the ones who change their mind after having downloaded the manhua/manhwa in the cbz format (like me, yes, I felt very stupid after doing that) soon :>
+- <b>Note:</b> I will add the cbz to pdf converter for the ones who change their mind after having downloaded the manhua/manhwa in the cbz format (like me, yes, I felt very stupid after doing that) soon :>

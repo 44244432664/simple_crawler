@@ -19,6 +19,7 @@ def create_epub(json_file, output_path=None, chapter_num=None):
     or tuple of 2 numbers to include a range of chapters.
     Example: (1, 5) will include chapters from 1 to 5.
     """
+    # print(f"Creating EPUB file {chapter_num} from {json_file}...")
     # Ensure the input file exists
 
     if not os.path.isfile(json_file):
@@ -125,16 +126,23 @@ def create_epub(json_file, output_path=None, chapter_num=None):
 
     # Add chapters
     chapters = []
+    # print(type(chapter_num))
     if chapter_num is None:
         chapters = novel_info["chapters"]
     elif isinstance(chapter_num, list):
         for i in chapter_num:
-            if isinstance(i, int) and 0 < i <= novel_info["num_chapters"] and novel_info["chapters"][i - 1]["index"]==i:
-                chapters.append(novel_info["chapters"][i - 1])
+            # print(f"Processing chapter: {i}")
+            if isinstance(i, int) and 0 < i <= novel_info["num_chapters"]:
+                for chapter in novel_info["chapters"]:
+                    if chapter["index"] == i:
+                        # print(f"Adding chapter {i} from novel_info")
+                        chapters.append(chapter)
+                        break
             elif isinstance(i, str):
                 idx = novel_info["chapters"].index(i)+1
                 for chapter in novel_info["chapters"]:
                     if chapter["index"] == idx:
+                        # print(f"Adding chapter {idx} from novel_info")
                         chapters.append(chapter)
                         break
                 else:
@@ -147,7 +155,10 @@ def create_epub(json_file, output_path=None, chapter_num=None):
     else:
         raise ValueError("Invalid chapter_num format. Must be None, a list of integers, link strings, or a tuple of two integers.")
 
+    # print(f"Total chapters to add: {len(chapters)}")
+
     for chapter in tqdm.tqdm(chapters, desc="Adding chapters", unit="chapter"):
+        # print(f"Processing chapter: {chapter['index']} - {chapter['title']}")
         c = epub.EpubHtml(
                 title=chapter["title"],
                 file_name=f"chap_{chapter['index']}.xhtml",
@@ -178,8 +189,21 @@ def create_epub(json_file, output_path=None, chapter_num=None):
     book.add_item(epub.EpubNav())
     
     # Save the epub file
-    epub.write_epub(f"{output_path}/{novel_info['title']}.epub", book, {})
-    
-    print(f"Epub file '{novel_info['title']}.epub' created successfully.")
+    if chapter_num is None:
+        ebook_name = f"{novel_info['title']}.epub"
+    else:
+        if isinstance(chapter_num, list):
+            if len(chapter_num) == 1:
+                ebook_name = f"{novel_info['title']} - Chương {chapter_num[0]}.epub"
+            else:
+                idx_list = [chapter['index'] for chapter in chapters]
+                ebook_name = f"{novel_info['title']} - Chương {' '.join(map(str, idx_list))}.epub"
+        elif isinstance(chapter_num, tuple):
+            ebook_name = f"{novel_info['title']} - Chương {chapter_num[0]} đến {chapter_num[1]}.epub"
+
+
+    epub.write_epub(f"{output_path}/{ebook_name}", book, {})
+
+    print(f"Epub file '{ebook_name}' created successfully.")
 
     return "Epub file created"

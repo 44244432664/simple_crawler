@@ -3,4 +3,4 @@ outputs/
 # Ignore all files in the Luma directory
 *.pyc
 *__pycache__
-*metruyen_cv*
+*metruyencv*

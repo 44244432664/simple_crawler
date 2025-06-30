@@ -6,3 +6,5 @@ Project to download and make comic from 2 sites that lncrawler has not crawl yet
 Yes, it is goes through a lot of if else, I will try to make it better if I still remember about it and/or have time in the future. Now I'm just gonna lie down before continue learning, I've neglected it for too long to feel like I'm doing sth useful :'>
 
 \* If you need an emergency project to store the comics or novels that you love which might be gone in some near future and you do not have the money to buy the whole comic or the country just does not import the comic, hope you enjoy this project before finding a better one :3
+
+<u>Note:</u> Will try to modify truyencv_downloader for better indexing (maybe), since native ereader(e.g. KoReader or NeoEreader) cannot seems to fully load the content of downloaded file.

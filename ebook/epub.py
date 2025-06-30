@@ -61,7 +61,7 @@ def create_epub(json_file, output_path=None, chapter_num=None):
     toc = []
     spine = []
 
-    if novel_info["cover_image"]:
+    if "cover_image" in novel_info and novel_info["cover_image"]:
         cover_name = novel_info["cover_image"].split("/")[-1]
         with open(f"{novel_info['cover_image']}", "rb") as cover_file:
             cover_content = cover_file.read()
@@ -86,9 +86,9 @@ def create_epub(json_file, output_path=None, chapter_num=None):
             type="text/css",
             )
         
-    book.add_item(cover_item)
-    spine.append(cover_item)
-    toc.append(epub.Link(cover_name, "Bìa sách", "cover"))
+        book.add_item(cover_item)
+        spine.append(cover_item)
+        toc.append(epub.Link(cover_name, "Bìa sách", "cover"))
     
     # Add introduction
     intro = epub.EpubHtml(
@@ -206,4 +206,4 @@ def create_epub(json_file, output_path=None, chapter_num=None):
 
     print(f"Epub file '{ebook_name}' created successfully.")
 
-    return "Epub file created"
+    return f"{output_path}/{ebook_name}"

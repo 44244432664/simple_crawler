@@ -1,11 +1,11 @@
 from crawler.crawl_qq import QQCrawler, control_QQcrawler
 from crawler.crawl_wikidich import WikiCrawler, control_Wikidich_crawler
+from crawler.crawl_xx import crawl_xx, xx_control
 
 from ebook.make_pdf import create_pdf
 from ebook.make_cbz import create_cbz
 from ebook.epub import create_epub
 from ebook.cbz_converter import cbz2pdf
-
 import os
 import shutil
 
@@ -19,6 +19,7 @@ def main():
         # print("4. Create CBZ from images")
         # print("5. Create EPUB from novel info")
         print("3. Convert CBZ to PDF")
+        # print("4. Crawl XX novel")
         print("0. Exit")
 
         choice = input("Choose an option: ")
@@ -122,6 +123,11 @@ Enter your choice (1/2/3): """))
                             print(f"Invalid chapter format: {chapter}")
             except Exception as e:
                 raise Exception("Error during CBZ to PDF conversion: " + str(e))
+        elif choice == "xx_mode":
+            try:
+                xx_control()
+            except Exception as e:
+                raise Exception("Error during XX novel crawling: " + str(e))
         elif choice == "0":
             print("Exiting the program.")
             return

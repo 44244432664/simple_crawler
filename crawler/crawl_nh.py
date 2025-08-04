@@ -25,7 +25,7 @@ class crawl_nh:
             self.url = url
         # self.referrer = "https://truyenqqgo.com/"
         self.comic_name = None
-        self.path = os.path.join(os.getcwd(), "outputs") if output_dir is None else output_dir
+        self.path = "outputs" if output_dir is None else output_dir
         
 
     
@@ -42,6 +42,10 @@ class crawl_nh:
         
         # Extract comic name
         self.comic_name = soup.find('h1', class_='title').text.strip()
+        # clean up the comic name
+        self.comic_name = re.sub(r'[\\/:*?"<>|]', '', self.comic_name)
+        self.comic_name = re.sub(r'\s+', ' ', self.comic_name)
+        # Truncate comic name if it exceeds 300 characters
         if len(self.comic_name) > 300:
             print("Comic name is too long, truncating to 200 characters.")
             pattern = r'\[([^\]]+)\]'  # Matches content within square brackets
@@ -54,8 +58,11 @@ class crawl_nh:
         print(f"Comic name: {self.comic_name}")
         
         # Create output directory for the comic
+        print(f"path before: {self.path}")
         self.path = os.path.join(self.path, self.comic_name)
+        print(f"path after: {self.path}")
         if not os.path.exists(self.path):
+            print(f"Creating directory: {self.path}")
             os.makedirs(self.path)
         
         # Extract pages
@@ -65,12 +72,17 @@ class crawl_nh:
         for i, page in enumerate(tqdm.tqdm(pages, desc="Downloading pages")):
             img_url = page.find('a')['href']
             img_url = self.base_url + img_url
+            # img_url = self.url + str(i+1)
+            # if not img_url.startswith("http"):
+            #     img_url = "https:" + img_url
             img_response = requests.get(img_url, headers=headers)
             if img_response.status_code != 200:
                 print(f"Failed to fetch image {i+1}: {img_response.status_code}")
                 continue
             img_page = BeautifulSoup(img_response.content, 'html.parser')
             img_src = img_page.find(id='image-container').find('img')['src']
+            if not img_src.startswith("http"):
+                img_src = "https:" + img_src
             img = requests.get(img_src, headers=headers)
             if img.status_code != 200:
                 print(f"Failed to fetch image source {i}: {img.status_code}")

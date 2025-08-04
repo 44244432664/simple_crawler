@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+  <meta content="#1a202c" name="theme-color">
+   <meta content="yes" name="mobile-web-app-capable"/>
+   <meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+   <meta content="notranslate" name="google"/>
+   <meta content="otvmevdvj0kolvwuhj019cpxzilboz" name="facebook-domain-verification">
+    <meta content="https://cuutruyen.net/" property="og:url">
+     <meta content="Cứu Truyện - Truyện tranh sắc nét, quảng cáo dễ chịu nhất tại Việt Nam" property="og:site_name">
+      <meta content="article" property="og:type">
+       <meta content="https://64.media.tumblr.com/a6a94a248babb6aed0909ea2c1d5121d/d8d62e2d3199e29d-36/s2048x3072/0fb10de7c01a6f842fb1b14f43e24bdfa0fbe6d1.pnj" property="og:image"/>
+       <!--[if IE]><link rel="icon" href="/favicon.ico"><![endif]-->
+       <link href="/manifest.json" rel="manifest"/>
+       <title>
+        Cứu Truyện
+       </title>
+       <script defer="defer" src="/js/chunk-vendors.bccaba14.js">
+       </script>
+       <script defer="defer" src="/js/app.36509a1b.js">
+       </script>
+       <link href="/img/icons/favicon.svg" rel="icon" type="image/svg+xml"/>
+       <link href="/images/icons/favicon-32x32.png" rel="icon" sizes="32x32" type="image/png"/>
+       <link href="/images/icons/favicon-16x16.png" rel="icon" sizes="16x16" type="image/png"/>
+       <link href="/manifest.json" rel="manifest"/>
+       <meta content="#4DBA87" name="theme-color"/>
+       <meta content="yes" name="apple-mobile-web-app-capable"/>
+       <meta content="black" name="apple-mobile-web-app-status-bar-style"/>
+       <meta content="Cứu Truyện" name="apple-mobile-web-app-title"/>
+       <link href="/images/icons/apple-touch-icon.png" rel="apple-touch-icon"/>
+       <link color="#4DBA87" href="/images/icons/safari-pinned-tab.svg" rel="mask-icon"/>
+       <meta content="/images/icons/mstile-150x150.png" name="msapplication-TileImage"/>
+       <meta content="#000000" name="msapplication-TileColor"/>
+      </meta>
+     </meta>
+    </meta>
+   </meta>
+  </meta>
+ </head>
+ <body>
+  <noscript>
+   <strong>
+    We're sorry but manga4u_app doesn't work properly without JavaScript enabled. Please enable it to continue.
+   </strong>
+  </noscript>
+  <div id="app">
+  </div>
+ </body>
+</html>

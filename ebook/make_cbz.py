@@ -47,3 +47,34 @@ def create_cbz(comic_path, chapter, delete_page_0=False, delete_chapter_dir=True
             shutil.rmtree(f"{comic_path}/chapter {str(chapter)}")
         # print(f"Removed chapter {chapter} directory after creating cbz")
         return "cbz created"
+    
+    
+def files2cbz(path_list, delete_chapter_dir=True, cbz_name=None):
+    """
+    Create cbz from a list of file paths
+    """
+    if not path_list:
+        print("No files found to create cbz")
+        return "error"
+    
+    if not cbz_name:
+        cbz_name = "comic.cbz"
+    cbz_path = os.path.join(os.path.dirname(path_list[0]), cbz_name)
+    try:
+        with zipfile.ZipFile(cbz_path, "w") as cbz:
+            for file_path in path_list:
+                cbz.write(file_path, os.path.basename(file_path))
+        print(f"Saved files as {cbz_name}")
+    except Exception as e:
+        print("Error creating cbz: ", e)
+        return "error"
+    
+    # remove files after creating cbz
+    if delete_chapter_dir:
+        for file_path in path_list:
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"Error removing file {file_path}: {e}")
+        print(f"Removed files after creating cbz")
+    return "cbz created"

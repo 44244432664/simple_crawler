@@ -1,9 +1,10 @@
 from crawler.crawl_qq import QQCrawler, control_QQcrawler
 from crawler.crawl_wikidich import WikiCrawler, control_Wikidich_crawler
 from crawler.crawl_xx import crawl_xx, xx_control
+from crawler.crawl_nh import crawl_nh, nh_control
 
 from ebook.make_pdf import create_pdf
-from ebook.make_cbz import create_cbz
+from ebook.make_cbz import create_cbz, files2cbz
 from ebook.epub import create_epub
 from ebook.cbz_converter import cbz2pdf
 import os
@@ -128,6 +129,11 @@ Enter your choice (1/2/3): """))
                 xx_control()
             except Exception as e:
                 raise Exception("Error during XX novel crawling: " + str(e))
+        elif choice == "nh_mode":
+            try:
+                nh_control()
+            except Exception as e:
+                raise Exception("Error during nhentai crawling: " + str(e))
         elif choice == "0":
             print("Exiting the program.")
             return

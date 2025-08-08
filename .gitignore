@@ -4,4 +4,5 @@ outputs/
 *.pyc
 /__pycache__
 # ignore all files with name starting with "metruyencv"
-metruyencv*
+metruyencv*\
+.html

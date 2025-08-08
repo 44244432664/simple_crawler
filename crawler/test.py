@@ -58,42 +58,64 @@
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from PIL import Image
-import pytesseract
+# import pytesseract
+import requests
+from selenium import webdriver
+from tqdm import tqdm
 
 import time
 import os
 import json
 
-def get_user_config():
-    json_path = os.path.join(os.path.dirname(__file__), 'config.json')
-    if not os.path.exists(json_path):
-        raise FileNotFoundError(f"Configuration file not found: {json_path}")
-    
-    with open(json_path, 'r', encoding='utf-8') as file:
-        config = json.load(file)
-    return config
+base_url = "https://nhentai.net"
+nh_url = "https://nhentai.net/g/587488/"
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+}
 
-def write_user_config(config):
-    json_path = os.path.join(os.path.dirname(__file__), 'config.json')
-    with open(json_path, 'w', encoding='utf-8') as file:
-        json.dump(config, file, indent=4)
+# proxies = { 
+#               "http"  : "172.168.1.123:80", 
+#               "https" : "172.168.1.123:80", 
+#             }
+# response = requests.get(nh_url, headers=headers)
+# print(f"Response status code: {response.status_code}")
 
+web = webdriver.Chrome()
+web.get(nh_url)
+# time.sleep(2)  # Wait for the page to load
 
+soup = BeautifulSoup(web.page_source, 'html.parser')
+# soup = BeautifulSoup(response.content, 'html.parser')
+web.quit()
 
-def get_page_source(url):
-    # Initialize the Chrome driver
-    driver = webdriver.Chrome()
-    
+pages = soup.find_all('div', class_='thumb-container')
+print(f"Found {len(pages)} pages.")
+
+img_links = []
+
+img_types = ['jpg', 'png', 'gif', 'jpeg', 'webp']
+
+for i, page in enumerate(pages):
+    img_url = page.find('img')['src']
+    if "nhentai.net" not in img_url:
+        img_url = page.find('img')['data-src']
+    if not img_url.startswith("http"):
+        img_url = "https:" + img_url
+    print(f"\nImage URL {i+1}: {img_url}")
     try:
-        # Open the URL
-        driver.get(url)
-        
-        # Wait for the page to load completely
-        time.sleep(5)  # Adjust this sleep time as necessary
-        
-        # Get the page source
-        page_source = driver.page_source
-        
-        return page_source
-    finally:
-        driver.quit()
+        img_response = requests.get(img_url, headers=headers)
+        if img_response.status_code != 200:
+            print(f"Failed to fetch image {i+1}: {img_response.status_code}")
+            continue
+        img_links.append(img_url)
+
+    except requests.RequestException as e:
+        print(f"Error fetching image {i+1}: {e}")
+        continue
+
+    time.sleep(0.2)  # Sleep to avoid overwhelming the server
+
+print(f"Total images found: {len(img_links)}")
+print("Image links:")
+for link in img_links:
+    print(link)

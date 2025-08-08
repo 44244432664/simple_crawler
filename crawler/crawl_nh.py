@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import re
 import os
 import time
+from selenium import webdriver
 import tqdm
 
 from ebook.cbz_converter import cbz2pdf
@@ -32,13 +33,33 @@ class crawl_nh:
     def crawl(self):
         print(f"Starting to crawl {self.url}...")
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+            # "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+            # "User-Agent": "Mozilla/5.0"
         }
         response = requests.get(self.url, headers=headers)
+        rec = 0
+        while response.status_code != 200 and rec < 5:
+        # if response.status_code != 200 and rec != 5:
+            # print(f"status code: {response.status_code}")
+            # raise Exception(f"Failed to fetch the page: {response.status_code}")
+            print(f"Failed to fetch the page: {response.status_code}, retrying...")
+            time.sleep(0.2)
+            rec += 1
+            response = requests.get(self.url, headers=headers)
+
         if response.status_code != 200:
-            raise Exception(f"Failed to fetch the page: {response.status_code}")
+            print(f"Failed to fetch the page after 5 retries: {response.status_code}, trying with Selenium...")
+            # If the request fails, use Selenium to fetch the page
+            web = webdriver.Chrome()
+            web.get(self.url)
+            time.sleep(2)  # Wait for the page to load
+            content = web.page_source
+            web.quit()
+        else:
+            content = response.content
         
-        soup = BeautifulSoup(response.content, 'html.parser')
+        soup = BeautifulSoup(content, 'html.parser')
         
         # Extract comic name
         self.comic_name = soup.find('h1', class_='title').text.strip()
@@ -72,6 +93,7 @@ class crawl_nh:
         for i, page in enumerate(tqdm.tqdm(pages, desc="Downloading pages")):
             img_url = page.find('a')['href']
             img_url = self.base_url + img_url
+            print(f"Image URL {i+1}: {img_url}")
             # img_url = self.url + str(i+1)
             # if not img_url.startswith("http"):
             #     img_url = "https:" + img_url
@@ -81,6 +103,7 @@ class crawl_nh:
                 continue
             img_page = BeautifulSoup(img_response.content, 'html.parser')
             img_src = img_page.find(id='image-container').find('img')['src']
+            print(f"Image source {i+1}: {img_src}")
             if not img_src.startswith("http"):
                 img_src = "https:" + img_src
             img = requests.get(img_src, headers=headers)

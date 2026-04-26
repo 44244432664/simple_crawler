@@ -11,7 +11,7 @@ def create_cbz(comic_path, chapter, delete_page_0=False, delete_chapter_dir=True
         if not os.path.exists(f"{comic_path}/chapter {chapter}"):
             print(f"No images found for chapter {chapter}")
             return "error"
-        img_ext = [".jpg", ".jpeg", ".png", ".gif"]
+        img_ext = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"]
         fnames = [i for i in os.listdir(os.path.join(comic_path, f"chapter {chapter}")) if os.path.splitext(i)[1].lower() in img_ext]
         # print("Filenames before sorting: ", fnames)
         fnames.sort(key=lambda x: int(re.search(r'\d+', x).group()))  # sort by number in filename

@@ -158,7 +158,7 @@ class QQCrawler:
 
     def get_chapter_images(self, img_links, chapter_num): # links_of_img, referer="https://truyenqqgo.com/"
         fnames = []
-        img_extensions = [".jpg", ".jpeg", ".png", ".gif"]
+        img_extensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff"]
         header = {
             'referer'   : self.referrer,
             'sec-ch-ua' : '"Chromium";v="137", "Google Chrome";v="137", "Not.A/Brand";v="24"',
@@ -181,6 +181,7 @@ class QQCrawler:
                             ext = ext.split("?")[0]
                         if ext not in img_extensions:
                             print("Image extension not supported: ", ext)
+                            print("In URL: ", img_links[i])
                             continue
                         # save image
                         if not os.path.exists(f"{self.path}/chapter {chapter_num}"):

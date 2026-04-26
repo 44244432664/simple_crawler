@@ -101,7 +101,9 @@ class WikiCrawler:
         # genres = str(soup.find("li", class_="li--genres"))
         desc = str(soup.find("div", itemprop="description"))
         start_chapter = soup.find("a", string="Chương 1").get("href")
+        print("start chapter link:", start_chapter)
         end_chapter = soup.find("a", string="Chương cuối").get("href")
+        print("end chapter link:", end_chapter)
         # cover_image = soup.find("img", itemprop="image").get("src")
         # title = soup.find(class_="book-info").find(itemprop="name").text
         # author = soup.find("a", itemprop="author").text
@@ -184,6 +186,7 @@ class WikiCrawler:
             return
         chapter_links = []
         chapter_url = self.base_url + self.novel_info["start_chapter"]
+        print(f"Starting from chapter URL: {chapter_url}")
         i = 0
         tries = 0
         pbar = tqdm.tqdm(total=self.novel_info["num_chapters"], desc="Processing chapters", unit="chapter")
@@ -192,12 +195,17 @@ class WikiCrawler:
                 # if (i+1)%10 == 0:
                 #     print(f"Processing chapter {i+1}/{self.novel_info['num_chapters']}")
                 chapter_url = self.base_url+self.novel_info["start_chapter"] if i == 0 else chapter_url
-                soup = BeautifulSoup(requests.get(chapter_url).text, 'html.parser')
+                header = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+                }
+                respose = requests.get(chapter_url, headers=header)
+                # print(f"Requesting chapter {i+1} at URL: {chapter_url}, Status code: {respose.status_code}")
+                soup = BeautifulSoup(respose.text, 'html.parser')
                 next_chapter = soup.find(class_="next").get("href")
                 chapter_links.append(chapter_url)
                 chapter_url = self.base_url+next_chapter if next_chapter.startswith("/") else next_chapter
                 pbar.update(1)
-                time.sleep(0.1)  # To avoid overwhelming the server
+                time.sleep(2)  # To avoid overwhelming the server
             except Exception as e:
                 print(f"\nError processing chapter {i+1}: {e}")
                 print("Trying again...")

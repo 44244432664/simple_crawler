@@ -1,0 +1,112 @@
+{
+    "cover": {
+        "id": "",
+        "name": "",
+        "class_": "series-cover",
+        "attrs": "",
+        "other_attr": "url"
+    },
+    "title": {
+        "id": "",
+        "name": "span",
+        "class_": "series-name",
+        "attrs": ""
+    },
+    "genre": {
+        "id": "",
+        "name": "",
+        "class_": "series-gerne-item",
+        "attrs": ""
+    },
+    "description": {
+        "id": "",
+        "name": "",
+        "class_": "summary-content",
+        "attrs": "",
+        "text": true
+    },
+    "other_info": {
+        "holder": {
+            "id": "",
+            "name": "",
+            "class_": "info-name",
+            "attrs": ""
+        },
+        "value": {
+            "id": "",
+            "name": "",
+            "class_": "info-value",
+            "attrs": ""
+        }
+    },
+    "vol_group": {
+        "vol_section": {
+            "id": "",
+            "name": "",
+            "class_": "volume-list",
+            "attrs": ""
+        },
+        "vol_title": {
+            "id": "",
+            "name": "",
+            "class_": "sect-title",
+            "attrs": ""
+        },
+        "vol_cover": {
+            "id": "",
+            "name": "",
+            "class_": "volume-cover",
+            "attrs": "",
+            "other_attr": "url"
+        },
+        "chapter_list": {
+            "id": "",
+            "name": "",
+            "class_": "list-chapters",
+            "attrs": ""
+        }
+    },
+    "chapter": {
+        "title": {
+            "id": "",
+            "name": "h4",
+            "class_": "title-item",
+            "attrs": ""
+        },
+        "content": {
+            "id": "chapter-content",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        },
+        "image": {
+            "name": "img",
+            "class_": "",
+            "attrs": "",
+            "other_attr": "src",
+            "delete": 2
+        }
+    },
+    "vol_page": {
+        "vol_title": {
+            "id": "",
+            "name": "span",
+            "class_": "volume-name",
+            "attrs": ""
+        },
+        "vol_cover": {
+            "id": "",
+            "name": "",
+            "class_": "series-cover",
+            "attrs": "",
+            "other_attr": "url"
+        },
+        "chapter_list": {
+            "id": "",
+            "name": "",
+            "class_": "list-chapters",
+            "attrs": ""
+        }
+    },
+    "img_referrer": "https://docln.sbs/"
+}

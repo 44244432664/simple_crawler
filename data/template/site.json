@@ -1,0 +1,157 @@
+{
+  "cover": {
+    "id": "",
+    "name": "",
+    "class_": "",
+    "attrs": "",
+    "other_attr": "src"
+  },
+  "title": {
+    "id": "",
+    "name": "",
+    "class_": "",
+    "attrs": ""
+  },
+  "genre": {
+    "id": "",
+    "name": "",
+    "class_": "",
+    "attrs": "",
+    "click": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "description": {
+    "id": "",
+    "name": "",
+    "class_": "",
+    "attrs": "",
+    "text": true,
+    "click": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "other_info": {
+    "holder": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "value": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "vol_group": {
+    "vol_section": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "vol_title": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "vol_cover": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": "",
+      "other_attr": "src"
+    },
+    "chapter_list": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "chapter_list": {
+    "id": "",
+    "name": "",
+    "class_": "",
+    "attrs": ""
+  },
+  "vol_page": {
+    "vol_title": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "vol_cover": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": "",
+      "other_attr": "src"
+    },
+    "chapter_list": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "chapter": {
+    "title": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "content": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "image": {
+      "id": "",
+      "name": "img",
+      "class_": "",
+      "attrs": "",
+      "other_attr": "src",
+      "delete": 0
+    }
+  },
+  "img_referrer": false,
+  "login": {
+    "login_btn": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "username": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "password": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "submit_btn": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  }
+}

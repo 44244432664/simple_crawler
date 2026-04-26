@@ -1,0 +1,42 @@
+{
+    "cover": {
+        "id": "",
+        "name": "",
+        "class_": "book_avatar",
+        "attrs": "src",
+        "other_attr": ""
+    },
+    "title": {
+        "id": "",
+        "name": "h1",
+        "class_": "",
+        "itemprop": "name"
+    },
+    "genre": {
+        "id": "",
+        "name": "",
+        "class_": "list01",
+        "attrs": ""
+    },
+    "chapter_list": {
+        "id": "",
+        "name": "div",
+        "class_": "chapter-list",
+        "attrs": ""
+    },
+    "chapter": {
+        "content": {
+            "id": "",
+            "name": "div",
+            "class_": "chapter_content",
+            "attrs": ""
+        },
+        "images": {
+        "id": "",
+        "name": "img",
+        "class_": "",
+        "attrs": "src"
+        }
+    },
+    "img_referrer": true
+}

@@ -1,0 +1,149 @@
+{
+    "cover": {
+        "id": "",
+        "name": "img",
+        "class_": "rd-cover-image",
+        "attrs": "",
+        "other_attr": "src"
+    },
+    "title": {
+        "id": "",
+        "name": "h1",
+        "class_": "rd-novel-title",
+        "attrs": ""
+    },
+    "genre": {
+        "id": "",
+        "name": "span",
+        "class_": "rd-genre-tag",
+        "attrs": "",
+        "click": {
+            "id": "",
+            "name": "span",
+            "class_": "rd-toggle-genres",
+            "attrs": ""   
+        }
+    },
+    "description": {
+        "id": "",
+        "name": "div",
+        "class_": "rd-description-content",
+        "attrs": "",
+        "text": false,
+        "click": {
+            "id": "",
+            "name": "a",
+            "class_": "rd-show-toggle",
+            "attrs": ""   
+        }
+    },
+    "other_info": {
+        "holder": {
+            "id": "",
+            "name": "",
+            "class_": "rd-info-label",
+            "attrs": ""
+        },
+        "value": {
+            "id": "",
+            "name": "",
+            "class_": "rd-info-value",
+            "attrs": ""
+        }
+    },
+    "vol_group": {
+        "vol_section": {
+            "id": "",
+            "name": "div",
+            "class_": "module-content",
+            "attrs": ""
+        },
+        "vol_title": {
+            "id": "",
+            "name": "h3",
+            "class_": "module-title",
+            "attrs": ""
+        },
+        "vol_cover": {
+            "id": "",
+            "name": "img",
+            "class_": "module-cover-image",
+            "attrs": "",
+            "other_attr": "src"
+        },
+        "chapter_list": {
+            "id": "",
+            "name": "div",
+            "class_": "module-chapters-list",
+            "attrs": ""
+        }
+    },
+    "chapter": {
+        "title": {
+            "id": "",
+            "name": "h2",
+            "class_": "chapter-title-banner",
+            "attrs": ""
+        },
+        "content": {
+            "id": "",
+            "name": "div",
+            "class_": "chapter-content",
+            "attrs": ""
+        },
+        "image": {
+            "name": "img",
+            "class_": "",
+            "attrs": "",
+            "other_attr": "src"
+        }
+    },
+    "vol_page": {
+        "vol_title": {
+            "id": "",
+            "name": "span",
+            "class_": "volume-name",
+            "attrs": ""
+        },
+        "vol_cover": {
+            "id": "",
+            "name": "",
+            "class_": "series-cover",
+            "attrs": "",
+            "other_attr": "url"
+        },
+        "chapter_list": {
+            "id": "",
+            "name": "",
+            "class_": "list-chapters",
+            "attrs": ""
+        }
+    },
+    "img_referrer": false,
+    "login": {
+        "login_btn": {
+            "id": "",
+            "name": "button",
+            "class_": "login",
+            "attrs": ""
+        },
+        "username": {
+            "id": "",
+            "name": "input",
+            "class_": "",
+            "attrs": "username"
+        },
+        "password": {
+            "id": "",
+            "name": "input",
+            "class_": "",
+            "attrs": "password"
+        },
+        "submit_btn": {
+            "id": "",
+            "name": "button",
+            "class_": "auth-submit-button",
+            "attrs": "submit"
+        }
+    }
+}

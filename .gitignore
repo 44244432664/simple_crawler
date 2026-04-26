@@ -6,3 +6,5 @@ outputs/
 # ignore all files with name starting with "metruyencv"
 metruyencv*\
 .html
+.codex
+data/secrets.json

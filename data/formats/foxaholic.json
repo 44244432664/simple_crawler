@@ -1,42 +1,75 @@
 {
     "cover": {
         "id": "",
-        "name": "",
-        "class_": "book_avatar",
-        "attrs": "src",
-        "other_attr": ""
+        "name": "img",
+        "class_": "img-responsive effect-fade",
+        "attrs": "",
+        "other_attr": "src"
     },
     "title": {
         "id": "",
         "name": "h1",
         "class_": "",
-        "itemprop": "name"
+        "attrs": ""
+    },
+    "author": {
+        "id": "",
+        "name": "",
+        "class_": "",
+        "attrs": ""
     },
     "genre": {
         "id": "",
-        "name": "",
-        "class_": "list01",
-        "attrs": ""
+        "name": "a",
+        "class_": "",
+        "attrs": "",
+        "container": {"id": "", "name": "div", "class_": "genres-content", "attrs": ""}
     },
-    "chapter_list": {
+    "description": {
         "id": "",
         "name": "div",
-        "class_": "chapter-list",
-        "attrs": ""
+        "class_": "summary__content",
+        "attrs": "",
+        "text": true
+    },
+    "other_info": {
+        "holder": {"id": "", "name": "div", "class_": "summary-heading", "attrs": ""},
+        "value": {"id": "", "name": "div", "class_": "summary-content", "attrs": ""}
+    },
+    "vol_group": {
+        "vol_section": {"id": "", "name": "div", "class_": "listing-chapters_wrap", "attrs": ""},
+        "vol_title": {"vol_name": "Chapters"},
+        "vol_cover": {"id": "", "name": "", "class_": "", "attrs": "", "other_attr": ""},
+        "chapter_list": {"id": "", "name": "ul", "class_": "main", "attrs": ""}
+    },
+    "chapter_list": {"id": "", "name": "div", "class_": "listing-chapters_wrap", "attrs": ""},
+    "vol_page": {
+        "vol_title": {"id": "", "name": "", "class_": "", "attrs": ""},
+        "vol_cover": {"id": "", "name": "", "class_": "", "attrs": "", "other_attr": ""},
+        "chapter_list": {"id": "", "name": "", "class_": "", "attrs": ""}
     },
     "chapter": {
-        "content": {
-            "id": "",
-            "name": "div",
-            "class_": "chapter_content",
-            "attrs": ""
-        },
-        "images": {
-        "id": "",
-        "name": "img",
-        "class_": "",
-        "attrs": "src"
-        }
+        "title": {"id": "", "name": "", "class_": "", "attrs": ""},
+        "content": {"id": "", "name": "div", "class_": "reading-content", "attrs": ""},
+        "remove": [
+            {"name": "script"},
+            {"name": "noscript"},
+            {"name": "style"},
+            {"name": "iframe"},
+            {"class_": "foxaholic-google-tag-manager-body"},
+            {"class_": "foxaholic-publift-manga-chapter"},
+            {"class_": "foxaholic-bidgear-banner-3-content"},
+            {"class_prefix": "bg-ssp-"},
+            {"id_prefix": "bg-ssp-"}
+        ],
+        "image": {"id": "", "name": "img", "class_": "", "attrs": "", "other_attr": "src", "delete": 0}
+    },
+    "fetch": {
+        "mode": "auto",
+        "cloudflare": true,
+        "challenge_timeout_seconds": 300,
+        "profile_name": "foxaholic_com",
+        "headless": true
     },
     "img_referrer": true
 }

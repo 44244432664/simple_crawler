@@ -1,0 +1,52 @@
+{
+  "cover": {
+    "id": "", "name": "img", "class_": "", "attrs": "", "itemprop": "image", "other_attr": "src"
+  },
+  "title": {
+    "id": "", "name": "h3", "class_": "title", "attrs": "", "itemprop": "name"
+  },
+  "author": {
+    "id": "", "name": "a", "class_": "", "attrs": "", "itemprop": "author"
+  },
+  "genre": {
+    "id": "", "name": "a", "class_": "", "attrs": "", "itemprop": "genre"
+  },
+  "description": {
+    "id": "", "name": "div", "class_": "desc-text", "attrs": "", "itemprop": "description", "text": true
+  },
+  "other_info": {
+    "holder": {"id": "", "name": "", "class_": "", "attrs": ""},
+    "value": {"id": "", "name": "", "class_": "", "attrs": ""}
+  },
+  "vol_group": {
+    "vol_section": {"id": "", "name": "", "class_": "", "attrs": ""},
+    "vol_title": {"id": "", "name": "", "class_": "", "attrs": ""},
+    "vol_cover": {"id": "", "name": "", "class_": "", "attrs": "", "other_attr": ""},
+    "chapter_list": {"id": "", "name": "", "class_": "", "attrs": ""}
+  },
+  "chapter": {
+    "title": {"id": "", "name": "a", "class_": "chapter-title", "attrs": ""},
+    "content": {"id": "chapter-c", "name": "div", "class_": "chapter-c", "attrs": ""},
+    "image": {"id": "", "name": "", "class_": "", "attrs": "", "other_attr": "", "delete": 0}
+  },
+  "vol_page": {
+    "vol_title": {"id": "", "name": "", "class_": "", "attrs": ""},
+    "vol_cover": {"id": "", "name": "", "class_": "", "attrs": "", "other_attr": ""},
+    "chapter_list": {"id": "", "name": "", "class_": "", "attrs": ""}
+  },
+  "chapter-format": "chuong-{chapter}",
+  "fetch": {
+    "mode": "auto",
+    "cloudflare": true,
+    "challenge_timeout_seconds": 180,
+    "profile_name": "",
+    "headless": true
+  },
+  "img_referrer": false,
+  "login": {
+    "login_btn": {"id": "", "name": "", "class_": "", "attrs": ""},
+    "username": {"id": "", "name": "", "class_": "", "attrs": ""},
+    "password": {"id": "", "name": "", "class_": "", "attrs": ""},
+    "submit_btn": {"id": "", "name": "", "class_": "", "attrs": ""}
+  }
+}

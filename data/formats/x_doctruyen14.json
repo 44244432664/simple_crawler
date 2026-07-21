@@ -1,0 +1,140 @@
+{
+    "cover": {
+        "id": "",
+        "name": "",
+        "class_": "",
+        "attrs": "",
+        "other_attr": ""
+    },
+    "title": {
+        "id": "",
+        "name": "h1",
+        "class_": "entry-title",
+        "attrs": ""
+    },
+    "genre": {
+        "id": "",
+        "name": "",
+        "class_": "",
+        "attrs": ""
+    },
+    "description": {
+        "id": "",
+        "name": "",
+        "class_": "mo-ta-truyen",
+        "attrs": "",
+        "text": true
+    },
+    "other_info": {
+        "holder": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        },
+        "value": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        }
+    },
+    "vol_group": {
+        "vol_section": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        },
+        "vol_title": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        },
+        "vol_cover": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": "",
+            "other_attr": ""
+        },
+        "chapter_list": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        }
+    },
+    "chapter": {
+        "title": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        },
+        "content": {
+            "id": "",
+            "name": "",
+            "class_": "entry-content",
+            "attrs": ""
+        },
+        "image": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": "",
+            "other_attr": "",
+            "delete": 0
+        }
+    },
+    "vol_page": {
+        "vol_title": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        },
+        "vol_cover": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": "",
+            "other_attr": ""
+        },
+        "chapter_list": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        }
+    },
+    "chapter-format": "\\d+",
+    "img_referrer": false,
+    "login": {
+        "login_btn": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        },
+        "username": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        },
+        "password": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        },
+        "submit_btn": {
+            "id": "",
+            "name": "",
+            "class_": "",
+            "attrs": ""
+        }
+    }
+}

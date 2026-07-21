@@ -1,6 +1,7 @@
 [
     {
-        "novel_url": "https://docln.sbs/truyen/9910-co-gai-va-meo-me"
+        "novel_url": "https://docln.sbs/truyen/9910-co-gai-va-meo-me",
+        "headless": true
     },
     {
         "novel_url": "https://docln.sbs/truyen/8426-meo-va-rong"
@@ -16,6 +17,7 @@
     },
     {
         "novel_url": "https://docln.sbs/truyen/14380-otonari-no-tenshi-sama-ni-itsu-no-aida-ni-ka-dame-ningen-ni-sareteiru-ken",
+        "headless": true,
         "crawl_type_args": {
             "custom_volume_list": [
                 "https://docln.sbs/truyen/4981-otonari-no-tenshi-sama-ni-itsu-no-aida-ni-ka-dame-ningen-ni-sareteiru-ken/t8497-web-novel",

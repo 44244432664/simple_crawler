@@ -108,5 +108,32 @@
             "attrs": ""
         }
     },
-    "img_referrer": "https://docln.sbs/"
+    "img_referrer": "https://docln.sbs/",
+    "login": {
+        "login_btn": {
+            "id": "",
+            "name": "",
+            "class_": "login-link",
+            "attrs": ""
+        },
+        "username": {
+            "id": "name",
+            "name": "input",
+            "class_": "",
+            "attrs": ""
+        },
+        "password": {
+            "id": "password",
+            "name": "input",
+            "class_": "",
+            "attrs": ""
+        },
+        "submit_btn": {
+            "id": "",
+            "name": "button",
+            "class_": "auth-submit-button",
+            "attrs": "submit"
+        },
+        "log_w_cookies": true
+    }
 }

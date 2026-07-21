@@ -8,3 +8,8 @@ metruyencv*\
 .html
 .codex
 data/secrets.json
+PLAN/
+TASK/
+DOCS/
+.crawler_profiles/
+trash-prompt.txt

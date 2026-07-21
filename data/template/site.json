@@ -12,6 +12,12 @@
     "class_": "",
     "attrs": ""
   },
+  "author": {
+    "id": "",
+    "name": "",
+    "class_": "",
+    "attrs": ""
+  },
   "genre": {
     "id": "",
     "name": "",
@@ -126,6 +132,12 @@
       "other_attr": "src",
       "delete": 0
     }
+  },
+  "fetch": {
+    "mode": "requests",
+    "cloudflare": true,
+    "challenge_timeout_seconds": 180,
+    "profile_name": ""
   },
   "img_referrer": false,
   "login": {

@@ -1,4 +1,7 @@
 site,name,crawler_class
-docln.sbs,docln,NovelSelenium
+docln.sbs,docln,NovelRequest
 valvrareteam.net,valvrareteam,NovelSelenium
 truyenqqno.com,truyenqq,ComicRequests
+doctruyen14.net/,doctruyen14,XCrawler
+truyenfull.live,truyenfull,XCrawler
+foxaholic.com,foxaholic,NovelRequest

@@ -6,7 +6,8 @@
     "crawl_type": "full",
     "crawl_type_args": {},
     "book_type": "all",
-    "keep_logged_in": false
+    "keep_logged_in": false,
+    "fetch_mode": "auto"
   },
   {
     "novel_url": "https://example.com/novel-2",
@@ -20,7 +21,8 @@
       "info_url": null
     },
     "book_type": "all",
-    "keep_logged_in": false
+    "keep_logged_in": false,
+    "fetch_mode": "requests"
   },
   {
     "novel_url": "https://example.com/novel-3",
@@ -32,6 +34,7 @@
       "info_url": "https://example.com/novel-3"
     },
     "book_type": "volume",
-    "keep_logged_in": false
+    "keep_logged_in": false,
+    "fetch_mode": "browser"
   }
 ]

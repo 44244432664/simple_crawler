@@ -7,7 +7,8 @@
     "crawl_type_args": {},
     "book_type": "all",
     "keep_logged_in": false,
-    "fetch_mode": "auto"
+    "fetch_mode": "auto",
+    "max_workers": 4
   },
   {
     "novel_url": "https://example.com/novel-2",
@@ -22,7 +23,8 @@
     },
     "book_type": "all",
     "keep_logged_in": false,
-    "fetch_mode": "requests"
+    "fetch_mode": "requests",
+    "max_workers": 4
   },
   {
     "novel_url": "https://example.com/novel-3",
@@ -35,6 +37,7 @@
     },
     "book_type": "volume",
     "keep_logged_in": false,
-    "fetch_mode": "browser"
+    "fetch_mode": "browser",
+    "max_workers": 4
   }
 ]

@@ -88,8 +88,21 @@
     "id": "",
     "name": "",
     "class_": "",
-    "attrs": ""
+    "attrs": "",
+    "link": {
+      "name": "a",
+      "class_": "",
+      "attrs": ""
+    },
+    "pagination": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "max_pages": 250
   },
+  "chapter_list_order": "oldest_first",
   "vol_page": {
     "vol_title": {
       "id": "",
@@ -137,7 +150,8 @@
     "mode": "requests",
     "cloudflare": true,
     "challenge_timeout_seconds": 180,
-    "profile_name": ""
+    "profile_name": "",
+    "headless": true
   },
   "img_referrer": false,
   "login": {

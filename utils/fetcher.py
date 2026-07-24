@@ -69,6 +69,11 @@ DEFAULT_USER_AGENT = (
 )
 
 DEFAULT_REQUEST_TIMEOUT = 30
+DEFAULT_CLIENT_ERROR_RETRIES = 3
+"""Additional attempts to make after a non-Cloudflare 4xx response."""
+
+DEFAULT_CLIENT_ERROR_RETRY_DELAY = 2
+"""Seconds to wait between retries of a non-Cloudflare 4xx response."""
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -242,6 +247,12 @@ class PageFetcher:
         Run the browser in headless mode (no visible window).
         ``True`` by default.  Set to ``False`` for a visible browser
         (needed for interactive login or manual Cloudflare verification).
+    client_error_retries : int, optional
+        Number of additional requests to make after a non-Cloudflare 4xx
+        response.  Defaults to ``3``.  A 5xx response is never retried
+        because it indicates a server-side failure.
+    client_error_retry_delay : float, optional
+        Seconds to wait between 4xx retries.  Defaults to ``2``.
     """
 
     def __init__(
@@ -251,18 +262,26 @@ class PageFetcher:
         challenge_timeout: int = 180,
         profile_name: Optional[str] = None,
         headless: bool = True,
+        client_error_retries: int = DEFAULT_CLIENT_ERROR_RETRIES,
+        client_error_retry_delay: float = DEFAULT_CLIENT_ERROR_RETRY_DELAY,
     ):
         if not FetchMode.is_valid(fetch_mode):
             raise ValueError(
                 f"Invalid fetch_mode {fetch_mode!r}. "
                 f"Choose from {sorted(FetchMode._ALL)}"
             )
+        if client_error_retries < 0:
+            raise ValueError("client_error_retries must be zero or greater")
+        if client_error_retry_delay < 0:
+            raise ValueError("client_error_retry_delay must be zero or greater")
 
         self.fetch_mode = fetch_mode
         self.cloudflare = cloudflare
         self.challenge_timeout = challenge_timeout
         self._profile_name = profile_name
         self.headless = headless
+        self.client_error_retries = client_error_retries
+        self.client_error_retry_delay = client_error_retry_delay
 
         # Shared requests session
         self.session = requests.Session()
@@ -325,16 +344,24 @@ class PageFetcher:
             return self._browser_fetch(url, expected_selector)
 
         try:
-            return self._requests_fetch(url)
-        except CloudflareChallengeError:
-            if self.cloudflare:
+            return self._requests_fetch(url, expected_selector)
+        except (CloudflareChallengeError, SelectorMismatchError) as exc:
+            if not self.cloudflare or (
+                isinstance(exc, SelectorMismatchError) and self.headless
+            ):
+                raise
+            if isinstance(exc, SelectorMismatchError):
+                self._log.info(
+                    "Expected content selector missing at %s — switching to browser",
+                    url,
+                )
+            else:
                 self._log.info(
                     "Cloudflare challenge detected at %s — switching to browser",
                     url,
                 )
-                self._browser_mode_active = True
-                return self._browser_fetch(url, expected_selector)
-            raise
+            self._browser_mode_active = True
+            return self._browser_fetch(url, expected_selector)
 
     def close(self) -> None:
         """Release all resources (browser, session).
@@ -355,24 +382,93 @@ class PageFetcher:
     # Internal: requests
     # ------------------------------------------------------------------
 
-    def _requests_fetch(self, url: str) -> str:
-        self._log.debug("Requests fetch: %s", url)
-        try:
-            resp = self.session.get(url, timeout=DEFAULT_REQUEST_TIMEOUT)
-        except requests.RequestException as exc:
-            raise FetchError(
-                f"Request failed for {url}: {exc}"
-            ) from exc
+    def _requests_fetch(
+        self, url: str, expected_selector: Optional[str] = None
+    ) -> str:
+        """Fetch with bounded retries for ordinary client-side HTTP errors.
 
-        if self.cloudflare and is_cloudflare_challenge(resp):
-            raise CloudflareChallengeError(f"Cloudflare challenge detected at {url}")
+        Cloudflare is evaluated before generic 4xx handling so auto mode can
+        still switch to the browser.  Other 4xx responses are retried because
+        access controls can be temporary.  5xx responses are raised at once:
+        retrying from this crawler cannot repair an unavailable remote server.
+        """
+        for retry_number in range(self.client_error_retries + 1):
+            attempt = retry_number + 1
+            self._log.debug("Requests fetch (attempt %d): %s", attempt, url)
+            try:
+                resp = self.session.get(url, timeout=DEFAULT_REQUEST_TIMEOUT)
+            except requests.RequestException as exc:
+                raise FetchError(
+                    f"Request failed for {url}: {exc}"
+                ) from exc
 
-        try:
-            resp.raise_for_status()
-        except requests.RequestException as exc:
-            raise FetchError(
-                f"Request failed for {url}: {exc}"
-            ) from exc
+            status = resp.status_code
+            if 500 <= status <= 599:
+                self._log.warning(
+                    "HTTP %d for %s; stopping immediately because this is a "
+                    "server-side (5xx) error.",
+                    status,
+                    url,
+                )
+                raise FetchError(
+                    f"Request failed for {url}: HTTP {status}. "
+                    "The remote server returned a 5xx error, so the crawler "
+                    "will not retry. Try again after the server recovers."
+                )
+
+            # A Cloudflare challenge is a special 4xx case: auto mode needs
+            # the exception to activate its browser fallback instead of making
+            # repeated requests that cannot complete the challenge.
+            if self.cloudflare and is_cloudflare_challenge(resp):
+                raise CloudflareChallengeError(f"Cloudflare challenge detected at {url}")
+
+            if 400 <= status <= 499:
+                if retry_number < self.client_error_retries:
+                    self._log.warning(
+                        "HTTP %d for %s; retrying client error (%d/%d) in %ss.",
+                        status,
+                        url,
+                        attempt,
+                        self.client_error_retries + 1,
+                        self.client_error_retry_delay,
+                    )
+                    time.sleep(self.client_error_retry_delay)
+                    continue
+
+                self._log.warning(
+                    "HTTP %d for %s after %d attempts; giving up on the "
+                    "client-side (4xx) error.",
+                    status,
+                    url,
+                    attempt,
+                )
+                raise FetchError(
+                    f"Request failed for {url}: HTTP {status} after {attempt} attempts. "
+                    "The server continued to return a 4xx client error. Check "
+                    "the URL, credentials, or access permissions before retrying later."
+                )
+
+            try:
+                resp.raise_for_status()
+            except requests.RequestException as exc:
+                raise FetchError(
+                    f"Request failed for {url}: {exc}"
+                ) from exc
+            break
+
+        if expected_selector:
+            try:
+                found = BeautifulSoup(resp.text, "html.parser").select_one(
+                    expected_selector
+                )
+            except Exception as exc:
+                raise SelectorMismatchError(
+                    f"Invalid expected selector: {expected_selector}"
+                ) from exc
+            if not found:
+                raise SelectorMismatchError(
+                    f"Expected content selector not found: {expected_selector}"
+                )
 
         return resp.text
 
@@ -394,7 +490,13 @@ class PageFetcher:
                 f"Browser navigation failed for {url}: {exc}"
             ) from exc
 
-        if self.cloudflare and self._is_challenge_page(expected_selector):
+        challenge_active = self._is_challenge_page(expected_selector)
+        selector_missing = bool(expected_selector) and not self._has_expected_selector(
+            expected_selector
+        )
+        requires_manual_confirmation = not self.headless and selector_missing
+
+        if self.cloudflare and (challenge_active or requires_manual_confirmation):
             if self.headless:
                 self._log.info(
                     "Cloudflare challenge detected — "
@@ -411,7 +513,8 @@ class PageFetcher:
                     "waiting for manual verification in Chrome"
                 )
                 print(
-                    "\n[Cloudflare] Complete the verification in the Chrome window.\n"
+                    "\n[Cloudflare] Complete the verification in the Chrome window; "
+                    "the crawler is waiting for the novel page.\n"
                     f"[Cloudflare] Waiting up to {self.challenge_timeout}s …"
                 )
             deadline = time.monotonic() + self.challenge_timeout
@@ -422,37 +525,40 @@ class PageFetcher:
                     raise BrowserUnavailableError(
                         "Browser was closed during Cloudflare verification wait"
                     )
-                if not self._is_challenge_page(expected_selector):
-                    if expected_selector is None:
-                        break
-                    try:
-                        self._driver.wait_for_element(
-                            expected_selector, timeout=1
-                        )
-                        break
-                    except Exception:
-                        pass
+                if expected_selector and self._has_expected_selector(expected_selector):
+                    break
+                if not expected_selector and not self._is_challenge_page():
+                    break
                 time.sleep(1)
             else:
-                os.makedirs("debug_pages", exist_ok=True)
                 ts = time.strftime("%Y%m%d_%H%M%S")
                 import pathlib
                 safe_host = urlparse(url).netloc.replace(".", "_")
                 debug_path = f"debug_pages/cf_timeout_{safe_host}_{ts}.html"
-                pathlib.Path(debug_path).write_text(
-                    self._driver.page_source, encoding="utf-8"
-                )
+                debug_message = f"Debug page saved to {debug_path}"
+                try:
+                    os.makedirs("debug_pages", exist_ok=True)
+                    pathlib.Path(debug_path).write_text(
+                        self._driver.page_source, encoding="utf-8"
+                    )
+                except OSError as exc:
+                    self._log.warning(
+                        "Could not save Cloudflare timeout debug page %s: %s",
+                        debug_path,
+                        exc,
+                    )
+                    debug_message = f"Debug page could not be saved: {exc}"
                 if self.headless:
                     raise ChallengeTimeoutError(
                         f"Cloudflare automatic verification timed out after "
                         f"{self.challenge_timeout}s for {url}. "
                         f"Rerun with a visible browser by passing headless=False. "
-                        f"Debug page saved to {debug_path}"
+                        f"{debug_message}"
                     )
                 raise ChallengeTimeoutError(
                     f"Manual Cloudflare verification timed out after "
-                    f"{self.challenge_timeout}s for {url}. "
-                    f"Debug page saved to {debug_path}"
+                        f"{self.challenge_timeout}s for {url}. "
+                        f"{debug_message}"
                 )
 
         if expected_selector:
@@ -510,16 +616,17 @@ class PageFetcher:
         third-party script.  A matching, site-specific expected selector is
         therefore decisive evidence that the requested content has loaded.
         """
-        if expected_selector:
-            try:
-                if self._driver.find_elements("css selector", expected_selector):
-                    return False
-            except Exception:
-                # Keep marker detection as the fallback for invalid selectors
-                # or transient pages while navigation is still in progress.
-                pass
+        if expected_selector and self._has_expected_selector(expected_selector):
+            return False
         try:
             source = self._driver.page_source.lower()
         except Exception:
             return False
         return any(marker in source for marker in CF_STRONG_MARKERS)
+
+    def _has_expected_selector(self, expected_selector: str) -> bool:
+        """Return whether the visible browser currently has site content."""
+        try:
+            return bool(self._driver.find_elements("css selector", expected_selector))
+        except Exception:
+            return False

@@ -62,33 +62,21 @@ def create_epub(json_file, output_path=None, chapter_num=None):
     spine = []
 
     if "cover_image" in novel_info and novel_info["cover_image"]:
-        cover_name = novel_info["cover_image"].split("/")[-1]
+        cover_name = os.path.basename(novel_info["cover_image"])
+        cover_ext = os.path.splitext(cover_name)[1].lstrip(".").lower()
+        cover_media_type = "image/jpeg" if cover_ext in {"jpg", "jpeg"} else f"image/{cover_ext}"
         with open(f"{novel_info['cover_image']}", "rb") as cover_file:
             cover_content = cover_file.read()
-            book.set_cover(cover_name, cover_content, f"image/{cover_name.split('.')[-1]}")
+            book.set_cover(cover_name, cover_content)
+
+        # ebooklib creates both the image item and cover.xhtml.  Set the
+        # image's media type explicitly so a .jpg cover renders reliably.
+        cover_image_item = book.get_item_with_id("cover-img")
+        if cover_image_item:
+            cover_image_item.media_type = cover_media_type
         
         spine.append("cover")
-
-        cover_item = epub.EpubHtml(
-            uid="cover",
-            file_name=cover_name,
-            media_type=f"image/{cover_name.split('.')[-1]}",
-            content=f"""
-            <div id="cover">
-                <img src="{novel_info['cover_image']}" alt="Cover Image" style="width:100%; height:auto;" />
-            </div>
-            """
-        )
-
-        cover_item.add_link(
-            href="style.css",
-            rel="stylesheet",
-            type="text/css",
-            )
-        
-        book.add_item(cover_item)
-        spine.append(cover_item)
-        toc.append(epub.Link(cover_name, "Bìa sách", "cover"))
+        toc.append(epub.Link("cover.xhtml", "Bìa sách", "cover"))
     
     # Add introduction
     intro = epub.EpubHtml(

@@ -1,9 +1,11 @@
 import csv
+import threading
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from utils.novel import *
 from utils.fetcher import PageFetcher
-from crawler.Novel import NovelCrawler
+from crawler.Novel import NovelCrawler, validate_max_workers, DEFAULT_MAX_WORKERS
+from utils.worker_config import GlobalPacer, WorkerFetcherFactory, ChapterJob
 
 
 class XCrawler(NovelCrawler):
@@ -23,6 +25,7 @@ class XCrawler(NovelCrawler):
         driver=False,
         fetch_mode=None,
         headless=None,
+        max_workers=None,
     ):
         self.url = self._normalize_url(url or "")
         self.base_url = extract_base_url(self.url) if self.url else ""
@@ -33,6 +36,12 @@ class XCrawler(NovelCrawler):
         self.headless = headless  # None → resolve from format later
         self.fetcher = None
         self.driver = None
+        self.max_workers = validate_max_workers(
+            max_workers if max_workers is not None else DEFAULT_MAX_WORKERS
+        )
+        self._pacer = GlobalPacer(self.sleep_time)
+        self._worker_fetcher_factory = None  # Initialized after format_data is loaded
+        self._chapter_request_context = threading.local()
         self.start_chapter = start_chapter
         self.end_chapter = end_chapter
         self.site_name = None
@@ -78,6 +87,11 @@ class XCrawler(NovelCrawler):
 
         self.fetch_mode = self.fetch_mode or "requests"
         fetch_config = self.format_data.get("fetch", {})
+        self._worker_fetcher_factory = WorkerFetcherFactory(
+            cloudflare=fetch_config.get("cloudflare", True),
+            challenge_timeout=fetch_config.get("challenge_timeout_seconds", 180),
+            profile_name=fetch_config.get("profile_name") or None,
+        )
         self.fetcher = PageFetcher(
             fetch_mode=self.fetch_mode,
             cloudflare=fetch_config.get("cloudflare", True),
@@ -170,6 +184,132 @@ class XCrawler(NovelCrawler):
         self.end_chapter = end
         return start, end
 
+    def _chapter_list_config(self):
+        """Return configured selectors for a paginated chapter list.
+
+        XCrawler still supports generated URLs for simple sites. A format can
+        instead provide ``chapter_list`` with a container selector and optional
+        ``link`` / ``pagination`` selectors when the novel page lists chapters.
+        """
+        config = self.format_data.get("chapter_list") or {}
+        if not isinstance(config, dict):
+            return {}, {}, {}
+
+        container = config.get("container", config)
+        if not isinstance(container, dict):
+            container = {}
+        container = self._clean_selector_args({
+            key: value
+            for key, value in container.items()
+            if key not in {"link", "pagination", "max_pages"}
+        })
+        link = self._clean_selector_args(config.get("link") or {"name": "a"})
+        pagination = self._clean_selector_args(config.get("pagination") or {})
+        return container, link, pagination
+
+    def _has_chapter_list_config(self):
+        container, _, _ = self._chapter_list_config()
+        return bool(container)
+
+    @staticmethod
+    def _canonical_url(url):
+        parsed = urlsplit(url)
+        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, ""))
+
+    def _is_chapter_link(self, url):
+        """Return whether *url* belongs to this novel and matches its format."""
+        candidate = urlsplit(url)
+        base = urlsplit(self.chapter_base_url)
+        if candidate.netloc.lower().removeprefix("www.") != base.netloc.lower().removeprefix("www."):
+            return False
+
+        chapter_format = self._chapter_format().strip()
+        pattern = self._chapter_format_pattern()
+        if chapter_format.startswith("?"):
+            return bool(re.fullmatch(pattern, f"?{candidate.query}"))
+
+        base_path = base.path.rstrip("/")
+        candidate_path = candidate.path.rstrip("/")
+        prefix = f"{base_path}/"
+        if not candidate_path.startswith(prefix):
+            return False
+        chapter_postfix = candidate_path[len(prefix):]
+        return bool(re.fullmatch(pattern, chapter_postfix))
+
+    def _discover_chapter_links(self, first_page_html):
+        """Discover every configured chapter-list page and return its links.
+
+        Pagination is traversed from page links rather than guessing a URL
+        pattern, so formats remain reusable across sites with different routes.
+        """
+        container_selector, link_selector, pagination_selector = self._chapter_list_config()
+        expected_selector = selector_to_css(container_selector)
+        max_pages = int(self.format_data.get("chapter_list", {}).get("max_pages", 250))
+        first_page_url = self.chapter_base_url
+        if not urlsplit(first_page_url).query:
+            first_page_url = f"{first_page_url.rstrip('/')}/"
+        page_queue = [(first_page_url, first_page_html)]
+        seen_pages = set()
+        queued_pages = {self._canonical_url(first_page_url)}
+        seen_links = set()
+        chapter_links = []
+
+        while page_queue and len(seen_pages) < max_pages:
+            page_url, page_html = page_queue.pop(0)
+            page_url = self._canonical_url(page_url)
+            if page_url in seen_pages:
+                continue
+            seen_pages.add(page_url)
+
+            soup = BeautifulSoup(page_html, "html.parser")
+            chapter_container = soup.find(**container_selector)
+            if chapter_container is None:
+                self.update_log(f"Chapter-list selector did not match pagination page: {page_url}")
+                continue
+
+            for anchor in chapter_container.find_all(**link_selector):
+                href = anchor.get("href")
+                if not href:
+                    continue
+                chapter_url = self._canonical_url(urljoin(page_url, href))
+                if chapter_url not in seen_links and self._is_chapter_link(chapter_url):
+                    seen_links.add(chapter_url)
+                    chapter_links.append(chapter_url)
+
+            if not pagination_selector:
+                continue
+            pagination = chapter_container.find(**pagination_selector)
+            if pagination is None:
+                continue
+            for anchor in pagination.find_all("a", href=True):
+                next_page_url = urljoin(page_url, anchor["href"])
+                parsed = urlsplit(next_page_url)
+                if parsed.scheme not in {"http", "https"}:
+                    continue
+                next_page_url = self._canonical_url(next_page_url)
+                if next_page_url not in seen_pages and next_page_url not in queued_pages:
+                    page_queue.append((next_page_url, self._get_page_content(next_page_url, expected_selector)))
+                    queued_pages.add(next_page_url)
+
+        if page_queue:
+            self.update_log(f"Stopped chapter-list discovery after configured limit of {max_pages} pages.")
+        self.update_log(f"Discovered {len(chapter_links)} chapter links across {len(seen_pages)} list pages.")
+        return chapter_links
+
+    def _build_discovered_volume(self, chapter_links, start_chapter=None, end_chapter=None):
+        if start_chapter is None and end_chapter is None:
+            start, end = 1, len(chapter_links)
+        else:
+            start, end = self._resolve_chapter_bounds(start_chapter, end_chapter)
+        selected_links = chapter_links[start - 1:end]
+        self.start_chapter = start
+        self.end_chapter = start + len(selected_links) - 1 if selected_links else start - 1
+        self.novel_info["start_chapter"] = self.start_chapter
+        self.novel_info["end_chapter"] = self.end_chapter
+        self.novel_info["num_chapters"] = len(selected_links)
+        self.novel_info["chapter_links"] = selected_links
+        return {"title": "vol_0", "cover_image": None, "chapter_links": selected_links}
+
     def _chapter_postfix(self, chapter_number):
         chapter_format = self._chapter_format()
         if "{chapter}" in chapter_format:
@@ -218,7 +358,6 @@ class XCrawler(NovelCrawler):
             self.url = self._normalize_url(info_url)
             self.chapter_base_url = self._url_without_chapter_postfix(self.url)
 
-        self._resolve_chapter_bounds(start_chapter, end_chapter)
         self.novel_info["novel_url"] = self.chapter_base_url
         info_selector = selector_to_css(self.format_data.get("title", {}))
         page_content = self._get_page_content(self.chapter_base_url, expected_selector=info_selector)
@@ -232,7 +371,7 @@ class XCrawler(NovelCrawler):
         self.novel_info["title"] = self.title
         self.update_log(f"Extracted novel title: {self.title}", new=True)
 
-        if self.format_data.get("login") and self.keep_logged_in:
+        if self._has_login_config() and self.keep_logged_in:
             self.login_to_site(self.site_name, self.driver.page_source)
         soup = BeautifulSoup(self.driver.page_source, "html.parser") if self.keep_logged_in else BeautifulSoup(page_content, "html.parser")
         html_content = soup.prettify()
@@ -249,6 +388,7 @@ class XCrawler(NovelCrawler):
                 ext="jpg",
                 img_name="cover",
                 img_referrer=referrer,
+                referer_url=self.chapter_base_url,
                 cover_args=cover_args,
                 update_log=self.update_log,
             )
@@ -296,7 +436,24 @@ class XCrawler(NovelCrawler):
             self.novel_info["description"] = ""
         self.update_log(f"Extracted description: {self.novel_info['description'][:100]}...")
 
-        volumes = [self._build_generated_volume()]
+        if self._has_chapter_list_config():
+            chapter_links = self._discover_chapter_links(page_content)
+            chapter_list_order = self.format_data.get("chapter_list_order", "oldest_first")
+            if chapter_list_order == "newest_first":
+                chapter_links.reverse()
+            elif chapter_list_order != "oldest_first":
+                raise ValueError(
+                    "chapter_list_order must be 'oldest_first' or 'newest_first', "
+                    f"got {chapter_list_order!r}"
+                )
+            volumes = [
+                self._build_discovered_volume(
+                    chapter_links, start_chapter, end_chapter
+                )
+            ]
+        else:
+            self._resolve_chapter_bounds(start_chapter, end_chapter)
+            volumes = [self._build_generated_volume()]
         with open(os.path.join(self.output_dir, "novel_info.json"), "w", encoding="utf-8") as f:
             json.dump({"info": self.novel_info, "volumes": volumes}, f, ensure_ascii=False, indent=4)
         return self.novel_info, volumes
@@ -310,26 +467,29 @@ class XCrawler(NovelCrawler):
         )
 
         volume = volumes[0]
-        all_chapters = []
+        chapter_links = volume.get("chapter_links", [])
         print(f"Crawling chapters {self.start_chapter} to {self.end_chapter}")
-        for idx, chap_url in tqdm.tqdm(
-            enumerate(volume["chapter_links"], start=self.start_chapter),
-            total=len(volume["chapter_links"]),
-            desc="Crawling Generated Chapters",
-            unit="chapter",
-        ):
-            chapter_data = self._crawl_chapter_with_retries(
-                chap_url,
-                img_output_dir=os.path.join(self.output_dir, "img"),
-                img_prefix=f"chap{idx}",
-                chapter_label=f"x_chapter_{idx}",
-                max_retries=5,
-            )
-            if chapter_data:
-                all_chapters.append(chapter_data)
-            time.sleep(self.sleep_time)
 
-        volume["chapter_contents"] = all_chapters
+        if not chapter_links:
+            volume["chapter_contents"] = []
+        else:
+            chapter_jobs = [
+                ChapterJob(
+                    position=idx - self.start_chapter,
+                    url=chap_url,
+                    img_output_dir=os.path.join(self.output_dir, "img"),
+                    img_prefix=f"chap{idx}",
+                    label=f"x_chapter_{idx}",
+                    max_retries=5,
+                )
+                for idx, chap_url in enumerate(chapter_links, start=self.start_chapter)
+            ]
+            volume["chapter_contents"] = self._schedule_chapters(
+                chapter_jobs,
+                desc="Crawling Generated Chapters",
+                unit="chapter",
+            )
+
         with open(os.path.join(self.output_dir, "novel_info.json"), "w", encoding="utf-8") as f:
             json.dump({"info": novel_info, "volumes": volumes}, f, ensure_ascii=False, indent=4)
         self.update_log("XCrawler chapter range completed and data saved.")

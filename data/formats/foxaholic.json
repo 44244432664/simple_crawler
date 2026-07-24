@@ -12,6 +12,12 @@
         "class_": "",
         "attrs": ""
     },
+    "info_page_ready": {
+        "id": "",
+        "name": "div",
+        "class_": "summary__content",
+        "attrs": ""
+    },
     "author": {
         "id": "",
         "name": "",
@@ -23,14 +29,16 @@
         "name": "a",
         "class_": "",
         "attrs": "",
-        "container": {"id": "", "name": "div", "class_": "genres-content", "attrs": ""}
+        "container": {"id": "", "name": "div", "class_": "genres-content", "attrs": ""},
+        "click": {"id": "", "name": "", "class_": "", "attrs": ""}
     },
     "description": {
         "id": "",
         "name": "div",
         "class_": "summary__content",
         "attrs": "",
-        "text": true
+        "text": true,
+        "click": {"id": "", "name": "", "class_": "", "attrs": ""}
     },
     "other_info": {
         "holder": {"id": "", "name": "div", "class_": "summary-heading", "attrs": ""},
@@ -38,11 +46,17 @@
     },
     "vol_group": {
         "vol_section": {"id": "", "name": "div", "class_": "listing-chapters_wrap", "attrs": ""},
-        "vol_title": {"vol_name": "Chapters"},
+        "vol_title": {"id": "", "name": "", "class_": "", "attrs": "", "vol_name": "Chapters"},
         "vol_cover": {"id": "", "name": "", "class_": "", "attrs": "", "other_attr": ""},
         "chapter_list": {"id": "", "name": "ul", "class_": "main", "attrs": ""}
     },
-    "chapter_list": {"id": "", "name": "div", "class_": "listing-chapters_wrap", "attrs": ""},
+    "chapter_list": {
+        "id": "", "name": "div", "class_": "listing-chapters_wrap", "attrs": "",
+        "link": {"name": "a", "class_": "", "attrs": ""},
+        "pagination": {"id": "", "name": "", "class_": "", "attrs": ""},
+        "max_pages": 250
+    },
+    "chapter_list_order": "newest_first",
     "vol_page": {
         "vol_title": {"id": "", "name": "", "class_": "", "attrs": ""},
         "vol_cover": {"id": "", "name": "", "class_": "", "attrs": "", "other_attr": ""},
@@ -62,14 +76,28 @@
             {"class_prefix": "bg-ssp-"},
             {"id_prefix": "bg-ssp-"}
         ],
-        "image": {"id": "", "name": "img", "class_": "", "attrs": "", "other_attr": "src", "delete": 0}
+        "image": {
+            "id": "",
+            "name": "img",
+            "class_": "",
+            "attrs": "",
+            "other_attr": "src",
+            "allowed_hosts": ["www.foxaholic.com"],
+            "delete": 0
+        }
     },
     "fetch": {
         "mode": "auto",
         "cloudflare": true,
         "challenge_timeout_seconds": 300,
         "profile_name": "foxaholic_com",
-        "headless": true
+        "headless": false
     },
-    "img_referrer": true
+    "img_referrer": true,
+    "login": {
+        "login_btn": {"id": "", "name": "", "class_": "", "attrs": ""},
+        "username": {"id": "", "name": "", "class_": "", "attrs": ""},
+        "password": {"id": "", "name": "", "class_": "", "attrs": ""},
+        "submit_btn": {"id": "", "name": "", "class_": "", "attrs": ""}
+    }
 }

@@ -1,7 +1,15 @@
 Project to download and make comic from 2 sites that lncrawler has not crawl yet: Truyenqq and Wikidich (also works for Wattpad at the current time since Wikidich is kind of copy Wattpad, just change the name and color). Yes, I know, I can just create a bot in lncrawl for Wikidich, but the thing is, I am stupid, so I have to do the hard way :>>>.
-- To use terminal interface, just run the 
+- To use the terminal interface, run this from the project root:
 
-```python main.py```
+```bash
+python main.py
+```
+
+The keyboard-first dashboard keeps the original commands: `comic`, `novel`,
+`epub`, `multi`, `db`, and `exit`. It also accepts the displayed menu numbers
+(and `batch` / `sources` as convenience aliases). The existing JSON batch
+format remains supported, so previously created `to_crawl.json` files can be
+used unchanged.
 
 Yes, it is goes through a lot of if else, I will try to make it better if I still remember about it and/or have time in the future. Now I'm just gonna lie down before continue learning, I've neglected it for too long to feel like I'm doing sth useful :'>
 

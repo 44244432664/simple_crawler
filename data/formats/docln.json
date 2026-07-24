@@ -12,18 +12,26 @@
         "class_": "series-name",
         "attrs": ""
     },
+    "author": {
+        "id": "",
+        "name": "",
+        "class_": "",
+        "attrs": ""
+    },
     "genre": {
         "id": "",
         "name": "",
         "class_": "series-gerne-item",
-        "attrs": ""
+        "attrs": "",
+        "click": {"id": "", "name": "", "class_": "", "attrs": ""}
     },
     "description": {
         "id": "",
         "name": "",
         "class_": "summary-content",
         "attrs": "",
-        "text": true
+        "text": true,
+        "click": {"id": "", "name": "", "class_": "", "attrs": ""}
     },
     "other_info": {
         "holder": {
@@ -66,6 +74,16 @@
             "attrs": ""
         }
     },
+    "chapter_list": {
+        "id": "",
+        "name": "",
+        "class_": "",
+        "attrs": "",
+        "link": {"name": "a", "class_": "", "attrs": ""},
+        "pagination": {"id": "", "name": "", "class_": "", "attrs": ""},
+        "max_pages": 250
+    },
+    "chapter_list_order": "oldest_first",
     "chapter": {
         "title": {
             "id": "",
@@ -80,6 +98,7 @@
             "attrs": ""
         },
         "image": {
+            "id": "",
             "name": "img",
             "class_": "",
             "attrs": "",
@@ -107,6 +126,13 @@
             "class_": "list-chapters",
             "attrs": ""
         }
+    },
+    "fetch": {
+        "mode": "requests",
+        "cloudflare": true,
+        "challenge_timeout_seconds": 180,
+        "profile_name": "",
+        "headless": true
     },
     "img_referrer": "https://docln.sbs/",
     "login": {

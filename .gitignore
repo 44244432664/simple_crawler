@@ -1,15 +1,28 @@
-Luma/
+.Luma/
 outputs/
 # Ignore all files in the Luma directory
 *.pyc
-/__pycache__
-# ignore all files with name starting with "metruyencv"
-metruyencv*\
+__pycache__/
+# Ignore generated pages whose names start with "metruyencv".
+metruyencv*
 .html
 .codex
-data/secrets.json
+# Local credentials and certificate material. Keep examples under a distinct,
+# tracked name such as .env.example.
+.env
+.env.*
+!.env.example
+secret
+secrets/
+data/secrets*.json
+*.pem
+*.key
+*.p12
+*.pfx
 PLAN/
 TASK/
 DOCS/
 .crawler_profiles/
+debug_pages/
+downloaded_files/
 trash-prompt.txt

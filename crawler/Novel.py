@@ -1,26 +1,68 @@
 from utils.novel import *
 from utils.fetcher import PageFetcher
+from utils.worker_config import (
+    DEFAULT_MAX_WORKERS,
+    validate_max_workers,
+    log_lock,
+    GlobalPacer,
+    WorkerFetcherFactory,
+    ChapterJob,
+    ChapterScheduler,
+)
+import ast
+import threading
 import traceback
+from urllib.parse import urljoin, urlsplit, urlunsplit
+
+
+def parse_custom_volume_list(value):
+    """Safely normalize an optional list of custom volume URLs.
+
+    Older job files may encode the list as a Python-style literal.  Parse
+    those literals without executing them, then require a list of non-empty
+    strings before passing it to a crawler.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = ast.literal_eval(value)
+        except (SyntaxError, ValueError) as exc:
+            raise ValueError(
+                "custom_volume_list must be a list of volume URL strings"
+            ) from exc
+    if not isinstance(value, list):
+        raise ValueError("custom_volume_list must be a list of volume URL strings")
+
+    normalized = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError("custom_volume_list must contain non-empty URL strings")
+        normalized.append(item.strip())
+    return normalized
 
 
 class NovelCrawler:
+    _supports_parallel = True  # Overridden to False by crawlers that require shared state
+
     def update_log(self, message, new=False):
         log_file = os.path.join(self.output_dir, "logs", "crawl_log.txt")
-        if not os.path.exists(os.path.dirname(log_file)):
-            os.makedirs(os.path.dirname(log_file))
-        if not os.path.exists(log_file):
-            with open(log_file, "w", encoding="utf-8") as f:
-                f.write("Novel Crawler Log\n\n")
-        if new:
-            # delete old log and start new log file
-            with open(log_file, "w", encoding="utf-8") as f:
-                f.write("Novel Crawler Log\n\n")
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(f"[{timestamp}] {message}\n\n")
+        with log_lock:
+            if not os.path.exists(os.path.dirname(log_file)):
+                os.makedirs(os.path.dirname(log_file))
+            if not os.path.exists(log_file):
+                with open(log_file, "w", encoding="utf-8") as f:
+                    f.write("Novel Crawler Log\n\n")
+            if new:
+                # delete old log and start new log file
+                with open(log_file, "w", encoding="utf-8") as f:
+                    f.write("Novel Crawler Log\n\n")
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(f"[{timestamp}] {message}\n\n")
 
 
-    def __init__(self, url=None, output_dir=None, sleep_time=1000, keep_logged_in=False, driver=False, fetch_mode=None, headless=None):
+    def __init__(self, url=None, output_dir=None, sleep_time=1000, keep_logged_in=False, driver=False, fetch_mode=None, headless=None, max_workers=None):
         self.url = url
         self.base_url = extract_base_url(url)
         # print("Base URL:", self.base_url)
@@ -31,6 +73,12 @@ class NovelCrawler:
         self.headless = headless  # None → resolve from format later
         self.fetcher = None
         self.driver = None
+        self.max_workers = validate_max_workers(
+            max_workers if max_workers is not None else DEFAULT_MAX_WORKERS
+        )
+        self._pacer = GlobalPacer(self.sleep_time)
+        self._worker_fetcher_factory = None  # Initialized after format_data is loaded
+        self._chapter_request_context = threading.local()
 
         if url:
             data = pd.read_csv("data/aliases.csv")
@@ -79,6 +127,11 @@ class NovelCrawler:
 
         self.fetch_mode = self.fetch_mode or "requests"
         fetch_config = getattr(self, "format_data", {}).get("fetch", {})
+        self._worker_fetcher_factory = WorkerFetcherFactory(
+            cloudflare=fetch_config.get("cloudflare", True),
+            challenge_timeout=fetch_config.get("challenge_timeout_seconds", 180),
+            profile_name=fetch_config.get("profile_name") or None,
+        )
         self.fetcher = PageFetcher(
             fetch_mode=self.fetch_mode,
             cloudflare=fetch_config.get("cloudflare", True),
@@ -121,9 +174,165 @@ class NovelCrawler:
     def _get_page_content(self, url, expected_selector=None):
         if self.driver:
             return get_page_content(self.driver, url)
+        context = getattr(self, "_chapter_request_context", None)
+        fetcher = getattr(context, "fetcher", None) if context is not None else None
+        if fetcher is not None:
+            if getattr(context, "pace_requests", False):
+                self._pacer.acquire()
+            return fetcher.fetch(url, expected_selector=expected_selector)
         return self.fetcher.fetch(url, expected_selector=expected_selector)
 
+    def _normalize_chapter_list_order(self, volumes):
+        """Normalize discovered chapter links to chronological order.
+
+        Site formats list chapters oldest-first unless they explicitly declare
+        ``chapter_list_order: newest_first``.  Reversing the extracted list
+        keeps non-numeric entries such as prologues and epilogues in their
+        intended relative order.
+        """
+        chapter_list_order = self.format_data.get("chapter_list_order", "oldest_first")
+        if chapter_list_order not in {"oldest_first", "newest_first"}:
+            raise ValueError(
+                "chapter_list_order must be 'oldest_first' or 'newest_first', "
+                f"got {chapter_list_order!r}"
+            )
+
+        if chapter_list_order == "oldest_first":
+            return volumes
+
+        for volume_index, volume in enumerate(volumes, start=1):
+            chapter_links = volume.get("chapter_links", [])
+            if not chapter_links:
+                continue
+            volume["chapter_links"] = list(reversed(chapter_links))
+            self.update_log(
+                f"Reversed chapter links for Volume {volume_index} "
+                "because chapter_list_order is newest_first."
+            )
+        return volumes
+
+    @staticmethod
+    def _clean_selector_args(selector, excluded=()):
+        """Remove blank and format-only values before BeautifulSoup lookup."""
+        return {
+            key: value
+            for key, value in (selector or {}).items()
+            if key not in excluded and value != ""
+        }
+
+    def _root_chapter_list_config(self):
+        """Return root chapter-list selectors from the current site template."""
+        config = self.format_data.get("chapter_list") or {}
+        if not isinstance(config, dict):
+            return {}, {}, {}
+        container = config.get("container", config)
+        if not isinstance(container, dict):
+            container = {}
+        container = self._clean_selector_args(
+            container, excluded={"link", "pagination", "max_pages"}
+        )
+        link = self._clean_selector_args(config.get("link") or {"name": "a"})
+        pagination = self._clean_selector_args(config.get("pagination") or {})
+        return container, link, pagination
+
+    def _has_login_config(self):
+        """Return whether a format contains usable login selectors.
+
+        The current template includes blank login fields as placeholders; those
+        must not trigger an attempted login just because the mapping exists.
+        """
+        login = self.format_data.get("login") or {}
+        return any(
+            isinstance(selector, dict)
+            and any(value != "" for value in selector.values())
+            for selector in login.values()
+        )
+
+    @staticmethod
+    def _canonical_page_url(url):
+        parsed = urlsplit(url)
+        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, ""))
+
+    def _discover_root_chapter_links(self, first_page_html):
+        """Discover chapters from a template root ``chapter_list`` selector.
+
+        This is used by non-X crawlers whose site format has no volume section.
+        Chapter anchors inside the configured pagination control are excluded.
+        """
+        container_selector, link_selector, pagination_selector = self._root_chapter_list_config()
+        if not container_selector:
+            return []
+
+        config = self.format_data.get("chapter_list", {})
+        max_pages = int(config.get("max_pages", 250))
+        expected_selector = selector_to_css(container_selector)
+        first_page_url = self.url
+        if not urlsplit(first_page_url).query:
+            first_page_url = f"{first_page_url.rstrip('/')}/"
+        page_queue = [(first_page_url, first_page_html)]
+        seen_pages = set()
+        queued_pages = {self._canonical_page_url(first_page_url)}
+        seen_chapters = set()
+        chapter_links = []
+        base_host = urlsplit(self.base_url).netloc.lower().removeprefix("www.")
+
+        while page_queue and len(seen_pages) < max_pages:
+            page_url, page_html = page_queue.pop(0)
+            page_url = self._canonical_page_url(page_url)
+            if page_url in seen_pages:
+                continue
+            seen_pages.add(page_url)
+
+            soup = BeautifulSoup(page_html, "html.parser")
+            container = soup.find(**container_selector)
+            if container is None:
+                self.update_log(f"Chapter-list selector did not match pagination page: {page_url}")
+                continue
+
+            pagination = container.find(**pagination_selector) if pagination_selector else None
+            pagination_links = {
+                id(anchor) for anchor in pagination.find_all("a", href=True)
+            } if pagination else set()
+            for anchor in container.find_all(**link_selector):
+                href = anchor.get("href")
+                if not href or id(anchor) in pagination_links:
+                    continue
+                chapter_url = self._canonical_page_url(urljoin(page_url, href))
+                chapter_host = urlsplit(chapter_url).netloc.lower().removeprefix("www.")
+                if chapter_host != base_host or chapter_url in seen_chapters:
+                    continue
+                seen_chapters.add(chapter_url)
+                chapter_links.append(chapter_url)
+
+            if not pagination:
+                continue
+            for anchor in pagination.find_all("a", href=True):
+                next_page_url = urljoin(page_url, anchor["href"])
+                parsed = urlsplit(next_page_url)
+                if parsed.scheme not in {"http", "https"}:
+                    continue
+                next_page_url = self._canonical_page_url(next_page_url)
+                if next_page_url not in seen_pages and next_page_url not in queued_pages:
+                    page_queue.append((next_page_url, self._get_page_content(
+                        next_page_url, expected_selector=expected_selector
+                    )))
+                    queued_pages.add(next_page_url)
+
+        if page_queue:
+            self.update_log(f"Stopped chapter-list discovery after configured limit of {max_pages} pages.")
+        self.update_log(f"Discovered {len(chapter_links)} root chapter links across {len(seen_pages)} list pages.")
+        return chapter_links
+
     def close(self):
+        """Release all resources after a crawl has completed.
+
+        This is safe to call from the command runner's ``finally`` block or
+        repeatedly by callers that end a crawl early.
+        """
+        if hasattr(self, '_worker_fetcher_factory') and self._worker_fetcher_factory:
+            self._worker_fetcher_factory.close_all()
+        if hasattr(self, '_pacer') and self._pacer:
+            self._pacer.close()
         if hasattr(self, 'fetcher') and self.fetcher:
             self.fetcher.close()
         if hasattr(self, 'driver') and self.driver:
@@ -131,6 +340,42 @@ class NovelCrawler:
                 self.driver.quit()
             except Exception:
                 pass
+            finally:
+                self.driver = None
+
+    def _create_worker_fetcher(self):
+        """Create a requests-only PageFetcher for a worker thread.
+
+        The fetcher inherits cloudflare/retry configuration from the parent
+        but is always in ``"requests"`` mode.  It is tracked centrally and
+        closed automatically when :meth:`close` is called.
+        """
+        if self._worker_fetcher_factory is None:
+            raise RuntimeError(
+                "Worker fetcher factory is not initialized. "
+                "Ensure the crawler has a valid URL and format_data."
+            )
+        return self._worker_fetcher_factory.get_fetcher()
+
+    def _run_chapter_job(self, job, fetcher, pace_requests=True):
+        """Run one chapter with a thread-local fetcher and pacing policy."""
+        context = getattr(self, "_chapter_request_context", None)
+        if context is None:
+            context = threading.local()
+            self._chapter_request_context = context
+        context.fetcher = fetcher
+        context.pace_requests = pace_requests
+        try:
+            return self._crawl_chapter_with_retries(
+                job.url,
+                img_output_dir=job.img_output_dir,
+                img_prefix=job.img_prefix,
+                chapter_label=job.label,
+                max_retries=job.max_retries,
+            )
+        finally:
+            context.fetcher = None
+            context.pace_requests = False
 
     
     def get_all_info(self, custom_volume_list=None, info_url=None):
@@ -138,7 +383,13 @@ class NovelCrawler:
         if custom_volume_list and info_url:
             self.url = info_url
 
-        info_selector = selector_to_css(self.format_data.get("title", {}))
+        # A title can be too broad to distinguish a generic block page from
+        # the actual novel.  Formats may provide a more specific ready marker
+        # for Cloudflare/browser recovery while title parsing still uses the
+        # normal ``title`` selector below.
+        info_selector = selector_to_css(self.format_data.get("info_page_ready", {}))
+        if not info_selector:
+            info_selector = selector_to_css(self.format_data.get("title", {}))
         page_content = self._get_page_content(
             self.url if not info_url else info_url,
             expected_selector=info_selector,
@@ -155,7 +406,7 @@ class NovelCrawler:
         self.novel_info['title'] = self.title
         self.update_log(f"Extracted novel title: {self.title}", new=True)
 
-        if self.format_data.get('login', None) and self.keep_logged_in:
+        if self._has_login_config() and self.keep_logged_in:
             self.login_to_site(self.site_name, self.driver.page_source)
         soup = BeautifulSoup(self.driver.page_source, 'html.parser') if self.keep_logged_in else BeautifulSoup(page_content, 'html.parser')
         html_content = soup.prettify()
@@ -178,7 +429,8 @@ class NovelCrawler:
         referrer = self.format_data['img_referrer'] if 'img_referrer' in self.format_data else False
         cover_image_url = get_cover_image_element(html_content, 
                                                   output_dir=self.output_dir+"/img", ext="jpg",
-                                                  img_name="cover", img_referrer=referrer, cover_args=cover_args, update_log=self.update_log)
+                                                  img_name="cover", img_referrer=referrer,
+                                                  referer_url=self.url, cover_args=cover_args, update_log=self.update_log)
         self.novel_info['cover_image'] = cover_image_url
         
         self.update_log(f"Extracted cover image URL: {cover_image_url}")
@@ -256,20 +508,41 @@ class NovelCrawler:
                 expected_selector=selector_to_css(self.format_data.get("title", {})),
             )
 
-            group = self.format_data['vol_group']
-            vol_section = {k: v for k, v in group['vol_section'].items() if v!=""}
-            vol_title = {k: v for k, v in group['vol_title'].items() if v!=""}
-            vol_cover = {k: v for k, v in group['vol_cover'].items() if v!=""}
-            if vol_cover:
-                vol_cover['output_dir'] = self.output_dir+"/img"
-            vol_chap = {k: v for k, v in group['chapter_list'].items() if v!=""}
-            volumes = get_all_volume(html_content, vol_sect=vol_section, 
-                                    vol_title=vol_title, 
-                                    vol_cover=vol_cover, 
-                                    vol_chap=vol_chap, 
-                                    base_url=self.base_url,
-                                    update_log=self.update_log)
-            self.update_log(f"Extracted information for {len(volumes)} volumes from the main page.")
+            group = self.format_data.get('vol_group', {})
+            vol_section = self._clean_selector_args(group.get('vol_section', {}))
+            if vol_section:
+                vol_title = self._clean_selector_args(group.get('vol_title', {}))
+                vol_cover = self._clean_selector_args(group.get('vol_cover', {}))
+                if vol_cover:
+                    vol_cover['output_dir'] = self.output_dir+"/img"
+                vol_chap = self._clean_selector_args(group.get('chapter_list', {}))
+                volumes = get_all_volume(html_content, vol_sect=vol_section,
+                                        vol_title=vol_title,
+                                        vol_cover=vol_cover,
+                                        vol_chap=vol_chap,
+                                        base_url=self.base_url,
+                                        update_log=self.update_log)
+                self.update_log(f"Extracted information for {len(volumes)} volumes from the main page.")
+            else:
+                chapter_links = self._discover_root_chapter_links(html_content)
+                if not chapter_links:
+                    raise ValueError(
+                        "Format needs either vol_group.vol_section or a root chapter_list selector."
+                    )
+                volumes = [{
+                    "title": "vol_0",
+                    "cover_image": None,
+                    "chapter_links": chapter_links,
+                }]
+                self.update_log(
+                    f"Extracted {len(chapter_links)} chapters from the root chapter list."
+                )
+        volumes = self._normalize_chapter_list_order(volumes)
+        self.novel_info["chapter_links"] = [
+            chapter_url
+            for volume in volumes
+            for chapter_url in volume.get("chapter_links", [])
+        ]
         print("Got all novel information.")
         with open(os.path.join(self.output_dir, 'novel_info.json'), 'w', encoding='utf-8') as f:
             json.dump({"info" : self.novel_info, "volumes": volumes}, f, ensure_ascii=False, indent=4)
@@ -306,7 +579,7 @@ class NovelCrawler:
                 if self.driver and self.keep_logged_in:
                     self.driver.get(chapter_url)
                     self.driver.implicitly_wait(10)
-                    logged_in = self.check_login_btn(self.driver.page_source) if self.format_data.get('login', None) else True
+                    logged_in = self.check_login_btn(self.driver.page_source) if self._has_login_config() else True
                     if not logged_in:
                         self.login_to_site(self.site_name, self.driver.page_source)
                 if self.keep_logged_in:
@@ -363,7 +636,12 @@ class NovelCrawler:
         self.update_log(f"Extracted chapter title: {chapter_title} and content (text only) from URL: {chapter_url}")
 
         image_prop = chapter_prop.get('image', {})
-        img_args = {k: v for k, v in image_prop.items() if k not in ['delete'] and v!=""}
+        allowed_image_hosts = image_prop.get("allowed_hosts")
+        img_args = {
+            k: v
+            for k, v in image_prop.items()
+            if k not in ["delete", "allowed_hosts"] and v != ""
+        }
         if img_args.get("other_attr") and any(k != "other_attr" for k in img_args):
             img_src = get_image_urls(chapter_body, self.base_url, **img_args)
             imgs = soup.find_all(**{k: v for k, v in img_args.items() if k not in ['other_attr'] and v!=""})
@@ -371,6 +649,19 @@ class NovelCrawler:
             img_src = []
             imgs = []
             self.update_log("No chapter image selector configured; skipping image extraction.")
+        if allowed_image_hosts:
+            allowed_image_hosts = set(allowed_image_hosts)
+            filtered_img_src = [
+                img_url
+                for img_url in img_src
+                if urlparse(img_url).hostname in allowed_image_hosts
+            ]
+            skipped_images = len(img_src) - len(filtered_img_src)
+            img_src = filtered_img_src
+            if skipped_images:
+                self.update_log(
+                    f"Skipped {skipped_images} chapter images from untrusted hosts."
+                )
         # print(f"image to delete: {chapter_prop['image']['delete']}, total images found: {len(img_src)}")
         if 'delete' in image_prop and image_prop['delete'] and imgs and img_src:
             delete_count = min(abs(image_prop['delete']), len(imgs), len(img_src))
@@ -381,16 +672,34 @@ class NovelCrawler:
         chapter_body = soup.prettify()
 
         chapter_img_folder = None
+        browser_cookies = None
+        browser = getattr(getattr(self, "fetcher", None), "_driver", None)
+        if browser is not None:
+            try:
+                browser_cookies = {
+                    cookie["name"]: cookie["value"]
+                    for cookie in browser.get_cookies()
+                    if cookie.get("name") and cookie.get("value")
+                }
+            except Exception:
+                # Images can still be downloaded using the normal referrer
+                # path when the browser does not expose its cookies.
+                browser_cookies = None
         for i, img_url in enumerate(img_src):
             img_name = f"{img_prefix}_img{i+1}"
             local_img_path = download_image(img_url, output_dir=img_output_dir, ext="jpg", name=img_name,
                                         img_referrer=self.format_data['img_referrer'] if 'img_referrer' in self.format_data else False, 
-                                        update_log=self.update_log)
-            new_chapter_body = re.sub(rf'{img_url}', local_img_path, chapter_body)
-            
-            chapter_body = new_chapter_body
-            
-            chapter_img_folder = os.path.dirname(local_img_path)
+                                        update_log=self.update_log, referer_url=chapter_url,
+                                        cookies=browser_cookies, browser_driver=browser)
+            if local_img_path:
+                chapter_body = re.sub(
+                    re.escape(img_url), local_img_path, chapter_body
+                )
+                chapter_img_folder = os.path.dirname(local_img_path)
+            else:
+                self.update_log(
+                    f"Keeping unresolved image URL in chapter content: {img_url}"
+                )
 
             # self.update_log(f"Downloaded image from {img_url} to {local_img_path} and updated chapter content.")
 
@@ -467,27 +776,182 @@ class NovelCrawler:
         return None
 
     
+    def _make_chapter_work_fn(self):
+        """Return a work function suitable for :class:`ChapterScheduler`.
+
+        The returned callable acquires the global pacer before each
+        chapter fetch and delegates to :meth:`_crawl_chapter_with_retries`.
+        """
+        def _work(job: ChapterJob):
+            return self._run_chapter_job(job, self._create_worker_fetcher())
+        return _work
+
+    def _is_parallel_safe(self):
+        """Return True if this crawler instance can safely use threaded chapter fetching.
+
+        Parallel execution is enabled only when all of the following hold:
+        - The crawler class supports independent request sessions.
+        - The resolved fetch mode is exactly ``"requests"``.
+        - No persistent login is requested.
+        - No Selenium driver is active.
+        """
+        if not self._supports_parallel:
+            return False
+        if getattr(self, "fetch_mode", None) != "requests":
+            return False
+        if getattr(self, "keep_logged_in", False):
+            return False
+        if getattr(self, "driver", None) is not None:
+            return False
+        return True
+
+    def _crawl_chapters_sequentially(self, chapter_jobs, desc="Crawling Chapters", unit="chapter"):
+        """Crawl *chapter_jobs* one at a time in source order.
+
+        This is the fallback path used when parallel execution is not safe
+        or when ``max_workers`` is 1.  It preserves all retry, pacing, and
+        error-handling behaviour of the threaded path.
+        """
+        results = []
+        pbar = None
+        try:
+            import tqdm as _tqdm
+            pbar = _tqdm.tqdm(total=len(chapter_jobs), desc=desc, unit=unit)
+        except ImportError:
+            pass
+
+        try:
+            for job in chapter_jobs:
+                result = self._run_chapter_job(
+                    job,
+                    self.fetcher,
+                    pace_requests=self.driver is None,
+                )
+                if result:
+                    results.append(result)
+                if pbar is not None:
+                    pbar.update(1)
+        finally:
+            if pbar is not None:
+                pbar.close()
+        return results
+
+    def _schedule_chapters(self, chapter_jobs, desc="Crawling Chapters", unit="chapter"):
+        """Submit *chapter_jobs* concurrently and return results in source order.
+
+        This is the single point of concurrency for all crawl paths.
+        It builds a :class:`ChapterScheduler` with the crawler's
+        ``max_workers``, wires in the global pacer, and returns the
+        ordered list of successful chapter payloads.
+
+        When parallel execution is not safe (browser/auto mode, persistent
+        login, active driver, or crawler without independent-session support)
+        the method falls back to a sequential for-loop that preserves all
+        retry, pacing, and error-handling behaviour.
+
+        Parameters
+        ----------
+        chapter_jobs : list[ChapterJob]
+            Ordered chapter descriptors.
+        desc : str
+            Progress-bar description prefix.
+        unit : str
+            Progress-bar unit label.
+
+        Returns
+        -------
+        list[dict]
+            Successful chapter payloads in source order.
+        """
+        if not chapter_jobs:
+            return []
+
+        if self.max_workers == 1 or not self._is_parallel_safe():
+            if self.max_workers > 1 and not self._is_parallel_safe():
+                reasons = []
+                if getattr(self, "fetch_mode", None) != "requests":
+                    reasons.append(f"fetch_mode={self.fetch_mode!r}")
+                if getattr(self, "keep_logged_in", False):
+                    reasons.append("keep_logged_in=True")
+                if getattr(self, "driver", None) is not None:
+                    reasons.append("driver=active")
+                if not self._supports_parallel:
+                    reasons.append("crawler does not support independent sessions")
+                reason_str = "; ".join(reasons) if reasons else "unknown"
+                msg = (
+                    f"Parallel crawling disabled ({reason_str}): "
+                    f"falling back to sequential execution."
+                )
+                print(msg)
+                self.update_log(msg)
+            return self._crawl_chapters_sequentially(chapter_jobs, desc, unit)
+
+        work_fn = self._make_chapter_work_fn()
+        total = len(chapter_jobs)
+
+        pbar = None
+        try:
+            import tqdm as _tqdm
+            pbar = _tqdm.tqdm(total=total, desc=desc, unit=unit)
+        except ImportError:
+            pass
+
+        def _on_progress(completed, _total):
+            if pbar is not None:
+                pbar.update(1)
+
+        def _on_error(job, error):
+            self.update_log(
+                f"Unhandled chapter worker error. URL: {job.url}. "
+                f"Error: {type(error).__name__}: {error}"
+            )
+
+        scheduler = ChapterScheduler(
+            work_fn=work_fn,
+            chapters=chapter_jobs,
+            max_workers=self.max_workers,
+            progress_fn=_on_progress,
+            error_fn=_on_error,
+        )
+        try:
+            results = scheduler.run()
+        finally:
+            if pbar is not None:
+                pbar.close()
+            # The scheduler has fully stopped before this point, so per-thread
+            # sessions can be closed before starting the next volume.
+            self._worker_fetcher_factory.close_all()
+
+        return results
+
     def crawl(self, custom_volume_list=None, info_url=None):
         novel_info, volumes = self.get_all_info(custom_volume_list=custom_volume_list, info_url=info_url)
         for idx, vol in enumerate(volumes):
-            all_chapters = []
-            self.update_log(f"Starting to crawl Volume {idx+1}: {vol['title']} with {len(vol['chapter_links'])} chapters.")
+            chapter_links = vol.get('chapter_links', [])
+            self.update_log(f"Starting to crawl Volume {idx+1}: {vol['title']} with {len(chapter_links)} chapters.")
             print(f"Crawling Volume {idx+1}: {vol['title']}")
-           
-            for jdx, chap_url in tqdm.tqdm(enumerate(vol['chapter_links']),
-                                           total=len(vol['chapter_links']),
-                                           desc=f"Crawling Volume {idx+1} Chapters", unit="chapter"):
-                # print(f"Crawling Volume {idx+1} - Chapter {jdx+1}: {chap_url}")
-                chapter_data = self._crawl_chapter_with_retries(
-                    chap_url,
+
+            if not chapter_links:
+                vol['chapter_contents'] = []
+                continue
+
+            chapter_jobs = [
+                ChapterJob(
+                    position=jdx,
+                    url=chap_url,
                     img_output_dir=self.output_dir + "/img",
                     img_prefix=f"vol{idx+1}_chap{jdx+1}",
-                    chapter_label=f"vol{idx+1}_chapter_{jdx+1}",
+                    label=f"vol{idx+1}_chapter_{jdx+1}",
                     max_retries=5,
                 )
-                all_chapters.append(chapter_data) if chapter_data else {}
-                time.sleep(self.sleep_time)
-            vol['chapter_contents'] = all_chapters
+                for jdx, chap_url in enumerate(chapter_links)
+            ]
+
+            vol['chapter_contents'] = self._schedule_chapters(
+                chapter_jobs,
+                desc=f"Crawling Volume {idx+1} Chapters",
+                unit="chapter",
+            )
 
         info = {"info" : novel_info}
         all_vol = {"volumes": volumes}
@@ -508,19 +972,26 @@ class NovelCrawler:
                 flattened_chapter_links.append(chap_url)
                 chapter_map.append(vol_idx)
         selected_chapter_links = flattened_chapter_links[start_chapter-1:end_chapter]
-        all_chapters = []
-        for i in tqdm.tqdm(range(len(selected_chapter_links)), desc="Crawling Selected Chapters", unit="chapters"):
-            chap_url = selected_chapter_links[i]
-            vol_idx = chapter_map[start_chapter - 1 + i]
-            chapter_data = self._crawl_chapter_with_retries(
-                chap_url,
-                img_output_dir=self.output_dir + "/img",
-                img_prefix=f"vol{vol_idx+1}_chap{start_chapter + i}",
-                chapter_label=f"range_chapter_{start_chapter + i}",
-                max_retries=5,
+
+        if not selected_chapter_links:
+            all_chapters = []
+        else:
+            chapter_jobs = [
+                ChapterJob(
+                    position=i,
+                    url=chap_url,
+                    img_output_dir=self.output_dir + "/img",
+                    img_prefix=f"vol{chapter_map[start_chapter - 1 + i]+1}_chap{start_chapter + i}",
+                    label=f"range_chapter_{start_chapter + i}",
+                    max_retries=5,
+                )
+                for i, chap_url in enumerate(selected_chapter_links)
+            ]
+            all_chapters = self._schedule_chapters(
+                chapter_jobs,
+                desc="Crawling Selected Chapters",
+                unit="chapters",
             )
-            all_chapters.append(chapter_data) if chapter_data else {}
-            time.sleep(self.sleep_time)
 
         vol_0 = {
             "title": f"Chapters {start_chapter} to {end_chapter}",
@@ -1366,6 +1837,12 @@ def test():
 
 def run(**kwargs):
     # print("args:", kwargs)
+    requested_max_workers = kwargs.get("max_workers", None)
+    max_workers = (
+        DEFAULT_MAX_WORKERS
+        if requested_max_workers is None
+        else validate_max_workers(requested_max_workers)
+    )
     db = pd.read_csv("data/aliases.csv")
     print(db)
     url = kwargs.get("novel_url", "")
@@ -1376,6 +1853,8 @@ def run(**kwargs):
     crawl_type = kwargs.get("crawl_type", "full")  # full, range, single
     # custom_volume_list = kwargs.get("custom_volume_list", None) # list of volume URLs
     crawl_type_args = kwargs.get("crawl_type_args", {})  # dict with args for crawl type
+    if not isinstance(crawl_type_args, dict):
+        raise ValueError("crawl_type_args must be a dictionary")
     book_type = kwargs.get("book_type", "all")  #  all, volume
     keep_logged_in = kwargs.get("keep_logged_in", False)  # whether to keep logged in state during crawling (for Selenium-based crawler)
     fetch_mode = kwargs.get("fetch_mode", None)  # requests / browser / auto — overrides site format default
@@ -1394,7 +1873,9 @@ def run(**kwargs):
     site_name = db.at[site_idx[0], 'name']
     class_name = db.at[site_idx[0], 'crawler_class']
     crawler = None
-    custom_volume_list = crawl_type_args.get("custom_volume_list", None)
+    custom_volume_list = parse_custom_volume_list(
+        crawl_type_args.get("custom_volume_list", None)
+    )
     info_url = crawl_type_args.get("info_url", None)
     start_chap = crawl_type_args.get("start_chapter", None)
     end_chap = crawl_type_args.get("end_chapter", None)
@@ -1408,7 +1889,7 @@ def run(**kwargs):
         if fetch_mode:
             print(f"  (Note: DoclnCrawler uses its own authenticated session; fetch_mode '{fetch_mode}' is ignored)")
         from crawler.crawl_docln import DoclnCrawler
-        crawler = DoclnCrawler(url, output_dir=output_dir, sleep_time=sleep_time)
+        crawler = DoclnCrawler(url, output_dir=output_dir, sleep_time=sleep_time, max_workers=max_workers)
     elif class_name == "XCrawler":
         print("Using generated chapter URL crawler.")
         from crawler.X import XCrawler
@@ -1422,17 +1903,18 @@ def run(**kwargs):
             driver=False,
             fetch_mode=fetch_mode,
             headless=headless,
+            max_workers=max_workers,
         )
     elif class_name == "NovelSelenium":
         print("Using Selenium-based crawler.")
         # crawler = NovelSelenium(url, output_dir=output_dir, sleep_time=sleep_time)
         # custom_volume_list = None
-        crawler = NovelCrawler(url, output_dir=output_dir, sleep_time=sleep_time, keep_logged_in=keep_logged_in, driver=True, fetch_mode=fetch_mode, headless=headless)
+        crawler = NovelCrawler(url, output_dir=output_dir, sleep_time=sleep_time, keep_logged_in=keep_logged_in, driver=True, fetch_mode=fetch_mode, headless=headless, max_workers=max_workers)
         # info_url = None
     else:
         print("Using Requests-based crawler.")
         # crawler = NovelRequests(url, output_dir=output_dir, sleep_time=sleep_time)
-        crawler = NovelCrawler(url, output_dir=output_dir, sleep_time=sleep_time, keep_logged_in=False, driver=False, fetch_mode=fetch_mode, headless=headless)
+        crawler = NovelCrawler(url, output_dir=output_dir, sleep_time=sleep_time, keep_logged_in=False, driver=False, fetch_mode=fetch_mode, headless=headless, max_workers=max_workers)
     # print("output dir:", crawler.output_dir)
 
     if class_name == "XCrawler":
@@ -1446,8 +1928,7 @@ def run(**kwargs):
     try:
         if crawl_type == "full":
             if custom_volume_list:
-                c_list = eval(custom_volume_list) if isinstance(custom_volume_list, str) else custom_volume_list
-                crawler.crawl(custom_volume_list=c_list, info_url=info_url)
+                crawler.crawl(custom_volume_list=custom_volume_list, info_url=info_url)
             else:
                 crawler.crawl()
         elif crawl_type == "range":
@@ -1526,9 +2007,11 @@ def novel_crawl():
     fetch_mode = input("Enter fetch mode (requests/browser/auto, leave blank for site default): ").strip() or None
     headless_input = input("Show browser window? (y/n, default n): ").strip().lower()
     headless = headless_input != "y"
+    max_workers_input = input("Enter chapter workers (default 4): ").strip() or "4"
+    max_workers = validate_max_workers(int(max_workers_input))
 
     run(novel_url=normalized_novel_url, output_dir=output_dir or None, sleep_time=sleep_time,
         crawl_type=crawl_type, crawl_type_args=crawl_type_args, book_type=book_type, keep_logged_in=keep_logged_in,
-        fetch_mode=fetch_mode, headless=headless)
+        fetch_mode=fetch_mode, headless=headless, max_workers=max_workers)
 
     

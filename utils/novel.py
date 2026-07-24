@@ -2,6 +2,8 @@ import os
 import time
 import threading
 import hashlib
+import base64
+from urllib.parse import urljoin, urlparse
 
 import re
 import requests
@@ -195,7 +197,7 @@ def extract_base_url(url):
 def selector_to_css(selector_dict):
     """Convert a format selector dict to a CSS selector string.
 
-    Handles ``id``, ``class_``, and ``name`` keys.  Returns ``None``
+    Handles ``id``, ``class_``, ``itemprop``, and ``name`` keys.  Returns ``None``
     when the dict is empty or every value is an empty string.
 
     Examples
@@ -213,6 +215,7 @@ def selector_to_css(selector_dict):
     name = selector_dict.get("name") or ""
     class_ = selector_dict.get("class_") or ""
     id_ = selector_dict.get("id") or ""
+    itemprop = selector_dict.get("itemprop") or ""
     if name:
         parts.append(name)
     if class_:
@@ -220,6 +223,8 @@ def selector_to_css(selector_dict):
             parts.append(f".{cls}")
     if id_:
         parts.append(f"#{id_}")
+    if itemprop:
+        parts.append(f'[itemprop="{itemprop}"]')
     return "".join(parts) if parts else None
 
 
@@ -294,14 +299,30 @@ def get_image_urls(html_content, base_url=None, **img_args):
             if not match:
                 continue
             img_url = match.group(1)
-        if base_url and not img_url.startswith('http'):
-            img_url = base_url + img_url
+        img_url = img_url.strip()
+        # Lazy-loading placeholders and inline data are already embedded in
+        # the page; requests cannot download them and they are not chapter
+        # assets to save locally.
+        if img_url.lower().startswith(("data:", "javascript:", "about:blank", "#")):
+            continue
+        if base_url and not img_url.startswith(('http://', 'https://')):
+            img_url = urljoin(base_url, img_url)
         img_urls.append(img_url)
     # print("Image URLs found: ", len(img_urls))
     return img_urls
 
 
-def download_image(img_url, output_dir="outputs/Novel/img", ext="jpg", name=None, img_referrer=False, update_log=None):
+def download_image(
+    img_url,
+    output_dir="outputs/Novel/img",
+    ext="jpg",
+    name=None,
+    img_referrer=False,
+    update_log=None,
+    referer_url=None,
+    cookies=None,
+    browser_driver=None,
+):
     """
     Download and save images from a list of URLs.
 
@@ -316,7 +337,11 @@ def download_image(img_url, output_dir="outputs/Novel/img", ext="jpg", name=None
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    host = img_referrer if isinstance(img_referrer, str) else extract_base_url(img_url)
+    host = (
+        img_referrer
+        if isinstance(img_referrer, str)
+        else (referer_url or extract_base_url(img_url))
+    )
     if img_referrer:
         default_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
@@ -331,48 +356,126 @@ def download_image(img_url, output_dir="outputs/Novel/img", ext="jpg", name=None
     temporary_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
     }
+    if name:
+        local_img_path = f"{output_dir}/{name}.{ext}"
+    else:
+        local_img_path = f"{output_dir}/img_{int(time.time())}.{ext}"
+
     tries = 0
+    image_host = urlparse(img_url).hostname
+    referer_host = urlparse(referer_url).hostname if referer_url else None
+    # Do not forward authenticated cookies to a third-party image host.
+    request_cookies = cookies if cookies and image_host == referer_host else None
+
+    def save_browser_image():
+        """Fetch a same-origin image through Chrome's verified session."""
+        if browser_driver is None or image_host != referer_host:
+            return ""
+        try:
+            result = browser_driver.execute_async_script(
+                """
+                const url = arguments[0];
+                const done = arguments[arguments.length - 1];
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 15000);
+                fetch(url, {credentials: 'same-origin', signal: controller.signal})
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        if (!blob.size) throw new Error('empty image response');
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            clearTimeout(timer);
+                            done({data: reader.result.split(',', 2)[1]});
+                        };
+                        reader.readAsDataURL(blob);
+                    })
+                    .catch(error => {
+                        clearTimeout(timer);
+                        done({error: String(error)});
+                    });
+                """,
+                img_url,
+            )
+            encoded = result.get("data") if isinstance(result, dict) else None
+            if not encoded:
+                return ""
+            image_bytes = base64.b64decode(encoded, validate=True)
+            if not image_bytes:
+                return ""
+            with open(local_img_path, "wb") as file:
+                file.write(image_bytes)
+            if update_log:
+                update_log(f"Image downloaded through verified browser: {img_url}")
+            return local_img_path
+        except Exception as exc:
+            if update_log:
+                update_log(f"Browser image fallback failed for {img_url}: {exc}")
+            return ""
+
     while tries < 5:
         try:
             request_headers = default_headers if no_override else temporary_headers
-            with requests.get(img_url, headers=request_headers) as response:
-                if name:
-                    local_img_path = f"{output_dir}/{name}.{ext}"
-                else:
-                    local_img_path = f"{output_dir}/img_{int(time.time())}.{ext}"
-                if response.status_code == 200:
+            with requests.get(
+                img_url,
+                headers=request_headers,
+                cookies=request_cookies,
+                timeout=20,
+            ) as response:
+                if response.status_code == 200 and response.content:
                     with open(local_img_path, "wb") as file:
                         file.write(response.content)
-                    update_log(f"Image downloaded successfully: {img_url}")
+                    if update_log:
+                        update_log(f"Image downloaded successfully: {img_url}")
                     return local_img_path
-                elif response.status_code == 403 and tries > 3:  # Access forbidden, possibly due to referrer issues
-                    if no_override:
-                        update_log(f"Access forbidden for image {img_url} with referrer {host}. Retrying without referrer...")
-                        print(f"Access forbidden for image {img_url} with referrer {host}. Retrying without referrer...")
-                        no_override = False  # Retry without referrer
+                elif response.status_code == 403:
+                    browser_path = save_browser_image()
+                    if browser_path:
+                        return browser_path
+                    if tries > 3:  # Access forbidden, possibly due to referrer issues
+                        if no_override:
+                            if update_log:
+                                update_log(f"Access forbidden for image {img_url} with referrer {host}. Retrying without referrer...")
+                            print(f"Access forbidden for image {img_url} with referrer {host}. Retrying without referrer...")
+                            no_override = False  # Retry without referrer
+                        else:
+                            if update_log:
+                                update_log(f"Access forbidden for image {img_url} without referrer. Retrying with referrer {host}...")
+                            print(f"Access forbidden for image {img_url} without referrer. Retrying with referrer {host}...")
+                            temporary_headers = {
+                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+                                "Referer": referer_url or extract_base_url(img_url)
+                            }  # Retry with referrer
                     else:
-                        update_log(f"Access forbidden for image {img_url} without referrer. Retrying with referrer {host}...")
-                        print(f"Access forbidden for image {img_url} without referrer. Retrying with referrer {host}...")
-                        temporary_headers = {
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
-                            "Referer": extract_base_url(img_url)
-                        }  # Retry with referrer
+                        if update_log:
+                            update_log(f"Failed to retrieve image {img_url}, status code: {response.status_code}")
+                        print(f"Failed to retrieve image {img_url}, status code: {response.status_code}")
                     tries += 1
                     time.sleep(2)
                 else:
-                    update_log(f"Failed to retrieve image {img_url}, status code: {response.status_code}")
-                    print(f"Failed to retrieve image {img_url}, status code: {response.status_code}")
+                    status_description = (
+                        "empty response"
+                        if response.status_code == 200
+                        else f"status code: {response.status_code}"
+                    )
+                    if update_log:
+                        update_log(f"Failed to retrieve image {img_url}, {status_description}")
+                    print(f"Failed to retrieve image {img_url}, {status_description}")
                     print("Retrying...")
                     tries += 1
                     time.sleep(2)
         except Exception as e:
-            update_log(f"Error retrieving image {img_url}: {e}")
+            if update_log:
+                update_log(f"Error retrieving image {img_url}: {e}")
             print(f"Error retrieving image {img_url}: {e}")
             print("Retrying...")
             tries += 1
             time.sleep(2)
     else:
-        update_log(f"Cannot retrieve image {img_url} after retries.\n")
+        if update_log:
+            update_log(f"Cannot retrieve image {img_url} after retries.\n")
         print(f"Failed to retrieve image {img_url} after retries.")
         return ""
 
@@ -636,8 +739,18 @@ def ensure_default_cover_for_novel(novel_info, output_dir, update_log=None, pers
 
 
 
-def get_cover_image_element(html_content, update_log, output_dir="outputs/Novel", ext="jpg", img_name=None, 
-                            img_referrer=False, **cover_args):
+def get_cover_image_element(
+    html_content,
+    update_log,
+    output_dir="outputs/Novel",
+    ext="jpg",
+    img_name=None,
+    img_referrer=False,
+    referer_url=None,
+    cookies=None,
+    browser_driver=None,
+    **cover_args,
+):
     """
     Extract the cover image URL (or element) from the HTML content.
 
@@ -687,8 +800,17 @@ def get_cover_image_element(html_content, update_log, output_dir="outputs/Novel"
         img_name = "cover"
     # print("Referrer: ", img_referrer)
     # print("Cover Image URL found: ", cover_url)
-    cover_image = download_image(cover_url, output_dir=output_dir, ext=ext, name=img_name, 
-                                 img_referrer=img_referrer, update_log=update_log)
+    cover_image = download_image(
+        cover_url,
+        output_dir=output_dir,
+        ext=ext,
+        name=img_name,
+        img_referrer=img_referrer,
+        referer_url=referer_url,
+        cookies=cookies,
+        browser_driver=browser_driver,
+        update_log=update_log,
+    )
 
     return cover_image
 
@@ -739,10 +861,11 @@ def get_genres(driver, html_content, **genre_args):
     """
     genre_args = dict(genre_args)
     container_args = genre_args.pop('container', None)
-    if driver and 'click' in genre_args:
-        click_args = genre_args['click']
+    click_args = genre_args.pop('click', None) or {}
+    click_selector = {k: v for k, v in click_args.items() if v != ""}
+    if driver and click_selector:
         soup_click = BeautifulSoup(html_content, 'html.parser')
-        click_element = soup_click.find(**{k: v for k, v in click_args.items() if v!=""})
+        click_element = soup_click.find(**click_selector)
         if click_element:
             # Simulate a click to reveal full genres
             # driver.get("data:text/html;charset=utf-8," + html_content)
@@ -754,7 +877,6 @@ def get_genres(driver, html_content, **genre_args):
                     html_content = driver.page_source
             except Exception as e:
                 print(f"Error simulating click for genres: {e}")
-        del genre_args['click']
     soup = BeautifulSoup(html_content, 'html.parser')
     if container_args:
         container = soup.find(**{k: v for k, v in container_args.items() if v != ""})
@@ -817,10 +939,12 @@ def get_description(driver, html_content, **desc_args):
     Returns:
         str: The description of the novel.
     """
-    if driver and 'click' in desc_args:
-        click_args = desc_args['click']
+    desc_args = dict(desc_args)
+    click_args = desc_args.pop('click', None) or {}
+    click_selector = {k: v for k, v in click_args.items() if v != ""}
+    if driver and click_selector:
         soup_click = BeautifulSoup(html_content, 'html.parser')
-        click_element = soup_click.find(**{k: v for k, v in click_args.items() if v!=""})
+        click_element = soup_click.find(**click_selector)
         if click_element:
             # Simulate a click to reveal full description
             # driver.get("data:text/html;charset=utf-8," + html_content)
@@ -832,7 +956,6 @@ def get_description(driver, html_content, **desc_args):
                     html_content = driver.page_source
             except Exception as e:
                 print(f"Error simulating click for description: {e}")
-        del desc_args['click']
     soup = BeautifulSoup(html_content, 'html.parser')
     args = {k: v for k, v in desc_args.items() if k != 'text' and v!=""}
     if desc_args.get('text', True):
@@ -1427,11 +1550,17 @@ def make_book_epub(novel_info, volume_list, title_added, output_path, ebook_name
     spine = []
 
     if "cover_image" in novel_info and novel_info["cover_image"]:
-        cover_name = novel_info["cover_image"].split("/")[-1]
+        cover_name = os.path.basename(novel_info["cover_image"])
         cover_media_type = mimetypes.guess_type(cover_name)[0] or "image/png"
         with open(f"{novel_info['cover_image']}", "rb") as cover_file:
             cover_content = cover_file.read()
-            book.set_cover(cover_name, cover_content, cover_media_type)
+            book.set_cover(cover_name, cover_content)
+
+        # ``set_cover`` also creates cover.xhtml.  Supply a proper image media
+        # type for the generated manifest item so readers can render JPEGs.
+        cover_image_item = book.get_item_with_id("cover-img")
+        if cover_image_item:
+            cover_image_item.media_type = cover_media_type
         
         spine.append("cover")
 

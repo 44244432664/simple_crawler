@@ -10,13 +10,16 @@ from test import get_login_token, get_page_with_cookies, login
 class DoclnCrawler(NovelCrawler):
     """NovelCrawler variant that authenticates Docln requests with cookies."""
 
-    def __init__(self, url, output_dir=None, sleep_time=1000, secrets_path=None):
+    _supports_parallel = False  # Uses a shared session for authenticated requests
+
+    def __init__(self, url, output_dir=None, sleep_time=1000, secrets_path=None, max_workers=None):
         super().__init__(
             url=url,
             output_dir=output_dir,
             sleep_time=sleep_time,
             keep_logged_in=False,
             driver=False,
+            max_workers=max_workers,
         )
         self.session = requests.Session()
         self.login_url = f"{self.base_url.rstrip('/')}/login"

@@ -12,18 +12,26 @@
         "class_": "entry-title",
         "attrs": ""
     },
-    "genre": {
+    "author": {
         "id": "",
         "name": "",
         "class_": "",
         "attrs": ""
+    },
+    "genre": {
+        "id": "",
+        "name": "",
+        "class_": "",
+        "attrs": "",
+        "click": {"id": "", "name": "", "class_": "", "attrs": ""}
     },
     "description": {
         "id": "",
         "name": "",
         "class_": "mo-ta-truyen",
         "attrs": "",
-        "text": true
+        "text": true,
+        "click": {"id": "", "name": "", "class_": "", "attrs": ""}
     },
     "other_info": {
         "holder": {
@@ -66,6 +74,16 @@
             "attrs": ""
         }
     },
+    "chapter_list": {
+        "id": "",
+        "name": "",
+        "class_": "",
+        "attrs": "",
+        "link": {"name": "a", "class_": "", "attrs": ""},
+        "pagination": {"id": "", "name": "", "class_": "", "attrs": ""},
+        "max_pages": 250
+    },
+    "chapter_list_order": "oldest_first",
     "chapter": {
         "title": {
             "id": "",
@@ -110,6 +128,13 @@
         }
     },
     "chapter-format": "\\d+",
+    "fetch": {
+        "mode": "requests",
+        "cloudflare": true,
+        "challenge_timeout_seconds": 180,
+        "profile_name": "",
+        "headless": true
+    },
     "img_referrer": false,
     "login": {
         "login_btn": {

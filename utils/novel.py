@@ -3,6 +3,7 @@ import time
 import threading
 import hashlib
 import base64
+import io
 from urllib.parse import urljoin, urlparse
 
 import re
@@ -367,6 +368,22 @@ def download_image(
     # Do not forward authenticated cookies to a third-party image host.
     request_cookies = cookies if cookies and image_host == referer_host else None
 
+    def save_image_bytes(image_bytes):
+        """Save a JPEG-named download as actual JPEG data when possible.
+
+        Crawl callers intentionally use a stable ``.jpg`` filename.  Foxaholic
+        can serve PNG/WebP assets, though, and putting those bytes in a JPEG
+        file makes the EPUB manifest lie about their media type.  Re-encode
+        valid non-JPEG images here; retain unexpected response bytes unchanged
+        so download failures remain diagnosable and existing callers preserve
+        their current failure behaviour.
+        """
+        content, _extension, _media_type = _prepare_epub_image(
+            image_bytes, local_img_path
+        )
+        with open(local_img_path, "wb") as file:
+            file.write(content)
+
     def save_browser_image():
         """Fetch a same-origin image through Chrome's verified session."""
         if browser_driver is None or image_host != referer_host:
@@ -405,8 +422,7 @@ def download_image(
             image_bytes = base64.b64decode(encoded, validate=True)
             if not image_bytes:
                 return ""
-            with open(local_img_path, "wb") as file:
-                file.write(image_bytes)
+            save_image_bytes(image_bytes)
             if update_log:
                 update_log(f"Image downloaded through verified browser: {img_url}")
             return local_img_path
@@ -425,8 +441,7 @@ def download_image(
                 timeout=20,
             ) as response:
                 if response.status_code == 200 and response.content:
-                    with open(local_img_path, "wb") as file:
-                        file.write(response.content)
+                    save_image_bytes(response.content)
                     if update_log:
                         update_log(f"Image downloaded successfully: {img_url}")
                     return local_img_path
@@ -478,6 +493,31 @@ def download_image(
             update_log(f"Cannot retrieve image {img_url} after retries.\n")
         print(f"Failed to retrieve image {img_url} after retries.")
         return ""
+
+
+def _prepare_epub_image(image_content, source_name):
+    """Return EPUB-safe image bytes, extension, and media type.
+
+    EPUB readers consistently support JPEG.  Converting valid non-JPEG input
+    also repairs images that previous crawler runs saved with a ``.jpg``
+    filename despite their bytes being PNG or WebP.
+    """
+    try:
+        with Image.open(io.BytesIO(image_content)) as source:
+            source.seek(0)
+            if source.format == "JPEG":
+                return image_content, "jpg", "image/jpeg"
+
+            rgba = source.convert("RGBA")
+            background = Image.new("RGBA", rgba.size, "white")
+            background.alpha_composite(rgba)
+            encoded = io.BytesIO()
+            background.convert("RGB").save(encoded, format="JPEG", quality=95)
+            return encoded.getvalue(), "jpg", "image/jpeg"
+    except (OSError, ValueError):
+        extension = os.path.splitext(source_name)[1].lstrip(".").lower()
+        media_type = mimetypes.guess_type(source_name)[0] or "application/octet-stream"
+        return image_content, extension or "bin", media_type
 
 
 DEFAULT_COVER_SIZE = (1200, 1800)
@@ -1363,33 +1403,32 @@ def make_chapter_epub(chapter_element, title_added, idx, update_log):
 
     chap_ele = BeautifulSoup(chapter_element['chapter_content'], 'html.parser')
     images = chap_ele.find_all('img')
-    img_map = {}
     epub_images = []
-    for img in images:
+    for image_index, img in enumerate(images, start=1):
         src = img.get('src')
         if not src:
             update_log(f"Image source not found for img: {img}")
             continue
-        else:
-            if "http" in src:
-                img.decompose()
-                update_log(f"External image source found and removed: {src}")
-                continue
+        if urlparse(src).scheme in {"http", "https"}:
+            img.decompose()
+            update_log(f"External image source found and removed: {src}")
+            continue
         try:
             with open(src, "rb") as img_file:
                 img_content = img_file.read()
 
-            mime_type = f"image/jpeg" 
-
-            epub_img_name = src.split("/")[-1]
-            epub_img_path = src
+            img_content, extension, mime_type = _prepare_epub_image(img_content, src)
+            asset_name = _safe_epub_filename(
+                f"image-{title_added[0] or 'chapter'}-{idx:04d}",
+                f"{image_index}-{os.path.basename(src)}",
+                f".{extension}",
+            )
+            epub_img_path = f"images/{asset_name}"
             epub_image = epub.EpubItem(
                 file_name=epub_img_path,
                 media_type=mime_type,
                 content=img_content
             )
-            # style.add_item(epub_image)
-            img_map[src] = epub_img_path
             img['src'] = epub_img_path
             epub_images.append(epub_image)
             update_log(f"Image processed and added to EPUB: {src}")
@@ -1427,10 +1466,6 @@ def make_chapter_epub(chapter_element, title_added, idx, update_log):
         rel="stylesheet",
         type="text/css",
     )
-    for epub_image in epub_images:
-        chapter.add_item(epub_image)
-
-
     update_log(f"Chapter '{chapter_title}' processed with {len(epub_images)} images.")
 
     return chapter, epub_images
@@ -1454,10 +1489,16 @@ def make_volume_epub(volume_info, chapter_list, title_added=("", "")):
         print("Volume cover image not found, skipping cover image.")
         cover_img = "data/images/backed_cover_1.png"
     with open(cover_img, "rb") as cover_file:
+        cover_content, extension, media_type = _prepare_epub_image(
+            cover_file.read(), cover_img
+        )
+        vol_image_path = "images/" + _safe_epub_filename(
+            "volume-cover", volume_info.get("title"), f".{extension}"
+        )
         vol_image = epub.EpubItem(
-            file_name=cover_img,
-            media_type="image/jpeg" if cover_img.endswith(".jpg") or cover_img.endswith(".jpeg") else "image/png",
-            content=cover_file.read()
+            file_name=vol_image_path,
+            media_type=media_type,
+            content=cover_content
         )
 
     volume = epub.EpubHtml(
@@ -1471,7 +1512,7 @@ def make_volume_epub(volume_info, chapter_list, title_added=("", "")):
         </div>
 
         <div id="volume-cover">
-            <img src="{volume_info['cover_image']}" alt="Volume Cover Image" style="width:100%; height:auto;" />
+            <img src="{vol_image_path}" alt="Volume Cover Image" style="width:100%; height:auto;" />
         </div>
         """
     )
@@ -1550,11 +1591,13 @@ def make_book_epub(novel_info, volume_list, title_added, output_path, ebook_name
     spine = []
 
     if "cover_image" in novel_info and novel_info["cover_image"]:
-        cover_name = os.path.basename(novel_info["cover_image"])
-        cover_media_type = mimetypes.guess_type(cover_name)[0] or "image/png"
         with open(f"{novel_info['cover_image']}", "rb") as cover_file:
-            cover_content = cover_file.read()
-            book.set_cover(cover_name, cover_content)
+            cover_content, cover_extension, cover_media_type = _prepare_epub_image(
+                cover_file.read(), novel_info["cover_image"]
+            )
+        cover_stem = os.path.splitext(os.path.basename(novel_info["cover_image"]))[0]
+        cover_name = f"{cover_stem}.{cover_extension}"
+        book.set_cover(cover_name, cover_content)
 
         # ``set_cover`` also creates cover.xhtml.  Supply a proper image media
         # type for the generated manifest item so readers can render JPEGs.

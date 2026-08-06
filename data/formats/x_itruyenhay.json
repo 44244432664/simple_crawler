@@ -1,0 +1,184 @@
+{
+  "cover": {
+    "id": "",
+    "name": "img",
+    "class_": "w-24 md:w-32 lg:w-80 lg:h-fit rounded-lg overflow-hidden aspect-2/3",
+    "attrs": "",
+    "other_attr": "src"
+  },
+  "title": {
+    "id": "",
+    "name": "h1",
+    "class_": "",
+    "attrs": ""
+  },
+  "author": {
+    "id": "",
+    "name": "",
+    "class_": "",
+    "attrs": ""
+  },
+  "genre": {
+    "id": "",
+    "name": "span",
+    "class_": "text-[9px] md:text-xs font-bold leading-none",
+    "attrs": "",
+    "click": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "description": {
+    "id": "",
+    "name": "article",
+    "class_": "text-sm h-72 overflow-y-auto md:text-base leading-relaxed text-gray-100 space-y-3",
+    "attrs": "",
+    "text": true,
+    "click": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "other_info": {
+    "holder": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "value": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "vol_group": {
+    "vol_section": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "vol_title": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "vol_cover": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": "",
+      "other_attr": ""
+    },
+    "chapter_list": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "chapter_list": {
+    "id": "",
+    "name": "",
+    "class_": "",
+    "attrs": "",
+    "link": {
+      "name": "a",
+      "class_": "",
+      "attrs": ""
+    },
+    "pagination": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "max_pages": 250
+  },
+  "chapter_list_order": "oldest_first",
+  "vol_page": {
+    "vol_title": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "vol_cover": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": "",
+      "other_attr": ""
+    },
+    "chapter_list": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  },
+  "chapter": {
+    "title": {
+      "id": "",
+      "name": "h2",
+      "class_": "chapter-title",
+      "attrs": ""
+    },
+    "content": {
+      "id": "",
+      "name": "div",
+      "class_": "content mx-auto",
+      "attrs": ""
+    },
+    "image": {
+      "id": "",
+      "name": "img",
+      "class_": "",
+      "attrs": "",
+      "other_attr": "src",
+      "delete": 0
+    }
+  },
+  "chapter-format": "chuong-{chapter}",
+  "fetch": {
+    "mode": "requests",
+    "cloudflare": true,
+    "challenge_timeout_seconds": 180,
+    "profile_name": "",
+    "headless": true
+  },
+  "img_referrer": "https://itruyenhay.org/",
+  "login": {
+    "login_btn": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "username": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "password": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    },
+    "submit_btn": {
+      "id": "",
+      "name": "",
+      "class_": "",
+      "attrs": ""
+    }
+  }
+}

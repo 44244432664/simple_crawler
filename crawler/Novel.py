@@ -643,34 +643,39 @@ class NovelCrawler:
             if k not in ["delete", "allowed_hosts"] and v != ""
         }
         if img_args.get("other_attr") and any(k != "other_attr" for k in img_args):
-            img_src = get_image_urls(chapter_body, self.base_url, **img_args)
+            image_attr = img_args["other_attr"]
             imgs = soup.find_all(**{k: v for k, v in img_args.items() if k not in ['other_attr'] and v!=""})
+            image_entries = []
+            for img in imgs:
+                raw_url = img.get(image_attr)
+                if not raw_url:
+                    continue
+                raw_url = raw_url.strip()
+                if raw_url.lower().startswith(("data:", "javascript:", "about:blank", "#")):
+                    continue
+                image_entries.append((img, urljoin(self.base_url, raw_url)))
         else:
-            img_src = []
-            imgs = []
+            image_entries = []
             self.update_log("No chapter image selector configured; skipping image extraction.")
         if allowed_image_hosts:
             allowed_image_hosts = set(allowed_image_hosts)
-            filtered_img_src = [
-                img_url
-                for img_url in img_src
-                if urlparse(img_url).hostname in allowed_image_hosts
+            filtered_image_entries = [
+                entry
+                for entry in image_entries
+                if urlparse(entry[1]).hostname in allowed_image_hosts
             ]
-            skipped_images = len(img_src) - len(filtered_img_src)
-            img_src = filtered_img_src
+            skipped_images = len(image_entries) - len(filtered_image_entries)
+            image_entries = filtered_image_entries
             if skipped_images:
                 self.update_log(
                     f"Skipped {skipped_images} chapter images from untrusted hosts."
                 )
         # print(f"image to delete: {chapter_prop['image']['delete']}, total images found: {len(img_src)}")
-        if 'delete' in image_prop and image_prop['delete'] and imgs and img_src:
-            delete_count = min(abs(image_prop['delete']), len(imgs), len(img_src))
+        if 'delete' in image_prop and image_prop['delete'] and image_entries:
+            delete_count = min(abs(image_prop['delete']), len(image_entries))
             for i in range(delete_count):
-                imgs[-(i+1)].decompose()
-                img_src.pop(-1)
+                image_entries.pop()[0].decompose()
             self.update_log(f"Deleted {delete_count} images in chapter content (set as ad).")
-        chapter_body = soup.prettify()
-
         chapter_img_folder = None
         browser_cookies = None
         browser = getattr(getattr(self, "fetcher", None), "_driver", None)
@@ -685,16 +690,17 @@ class NovelCrawler:
                 # Images can still be downloaded using the normal referrer
                 # path when the browser does not expose its cookies.
                 browser_cookies = None
-        for i, img_url in enumerate(img_src):
+        for i, (img, img_url) in enumerate(image_entries):
             img_name = f"{img_prefix}_img{i+1}"
             local_img_path = download_image(img_url, output_dir=img_output_dir, ext="jpg", name=img_name,
                                         img_referrer=self.format_data['img_referrer'] if 'img_referrer' in self.format_data else False, 
                                         update_log=self.update_log, referer_url=chapter_url,
                                         cookies=browser_cookies, browser_driver=browser)
             if local_img_path:
-                chapter_body = re.sub(
-                    re.escape(img_url), local_img_path, chapter_body
-                )
+                # Keep the parsed tag paired with its normalized download URL.
+                # This works for Foxaholic's relative ``/wp-content/...``
+                # sources as well as absolute URLs.
+                img[image_attr] = local_img_path
                 chapter_img_folder = os.path.dirname(local_img_path)
             else:
                 self.update_log(
@@ -702,6 +708,8 @@ class NovelCrawler:
                 )
 
             # self.update_log(f"Downloaded image from {img_url} to {local_img_path} and updated chapter content.")
+
+        chapter_body = soup.prettify()
 
         self.update_log(f"Finished processing chapter from URL: {chapter_url} with title: {chapter_title}")
         return {

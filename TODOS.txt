@@ -1,0 +1,45 @@
+idea:
+- AI recognition: use tool to crawl a novel site not in DB:
+    - with system prompt, novel page, 2-3 chapter page examples -> voila, structured json file updated in local DB to crawl
+    - maybe using an LLM for this as the model has to read 3 HTML pages (at least) with system prompt, and json files as reference to produce a json file -> thats a lot of content
+    - should be compatible with Chat, Gemini, Claude, Grok, etc. API (local AI is not good, but lets try later, realllllly later)
+- json files contain novel page structure, login btn position (for pages that required login, using selenium), then, user login, crawler hold session to continue crawling, session ends, user login again, no personal data hold (if user click remember me, perfect, session almost never end)
+
+
+TODO:
+- <urgent> fix foxaholic (and may be X) crawler for rendering cover and img in ebook
+- <urgent>fix default arg (the fetch mode) to auto x
+- <urgent> multi threading for crawling x
+- <normal> api layer + host online
+- <normal> push the code to github x
+- <later> vibe code another fallback (default) cover for ebook
+
+
+
+try to crawl:
+- https://www.novels.pl/novel/I-Got-a-New-Skill-Every-Time-I-Was-Exiled-and-After-100-Different-Worlds-I-Was-Unmatched?p=12
+=> final steps to fully crawl TS on foxaholic
+
+- to crawl:
+
+https://truyenqqno.com/truyen-tranh/nu-thanh-ceclilia-va-muc-su-lawrence-6797
+-> chưa end
+
+https://truyenqqno.com/truyen-tranh/chao-mung-cau-den-truong-iruma-kun-3188
+-> chưa end
+
+https://truyenqqno.com/truyen-tranh/mairimashita-iruma-kun-if-episode-of-mafia-15402
+-> chưa end
+
+
+to code:
+- 'crawl' at NovelCrawler -> yes. we're doing it, again, docln just enable java script, we're gonna make the crawler even more
+template -> DONE
+
+- make scripts to take multiple files to crawl (yes, I code like a retard so now I have to do this)
+
+-> take a json file of what we want to crawl, in there, a list of param to be passed will be there (the not None params), iterate through the list and crawl
+=> DONE
+
+- and make an option for referrer to be turned off in certain novels
+-> no need

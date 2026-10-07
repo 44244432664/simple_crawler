@@ -9,20 +9,24 @@ metruyencv*
 .codex
 # Local credentials and certificate material. Keep examples under a distinct,
 # tracked name such as .env.example.
+aliases.csv
+src/data/formats
+src/legacy/data_old
 .env
 .env.*
 !.env.example
 secret
 secrets/
-data/secrets*.json
+src/data/secrets*.json
 *.pem
 *.key
 *.p12
 *.pfx
-PLAN/
-TASK/
-DOCS/
+src/PLAN/
+src/TASK/
+src/legacy/DOCS/
 .crawler_profiles/
 debug_pages/
 downloaded_files/
 trash-prompt.txt
+script_comic/

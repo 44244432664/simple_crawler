@@ -1,0 +1,49 @@
+{
+  "content_type": "gallery",
+  "flow": [
+    {"module": "get_metadata", "params": {}},
+    {"module": "volumes_prepare", "params": {}},
+    {"module": "crawl_chapter", "params": {"actions": ["download_image"]}},
+    {"module": "create_ebook", "params": {}}
+  ],
+  "title": {},
+  "gallery_links": {
+    "container": {},
+    "link": {
+      "name": "a",
+      "other_attr": "href"
+    }
+  },
+  "picture": {
+    "image": {
+      "name": "img",
+      "other_attr": "src"
+    }
+  },
+  "fetch": {
+    "mode": "requests",
+    "cloudflare": true,
+    "challenge_timeout_seconds": 180,
+    "profile_name": "",
+    "headless": true
+  },
+  "img_referrer": false,
+  "image_delivery": {
+    "request_attempts": 5,
+    "request_timeout_seconds": 20,
+    "retry_delay_seconds": 2,
+    "stop_on_image_failure": false,
+    "resume_partial_downloads": false,
+    "incomplete_session_retries": 5,
+    "incomplete_retry_delay_seconds": 0,
+    "refresh_picture_page_on_failure": false,
+    "max_refreshes": 0,
+    "failure_hint": "",
+    "failure_page_fallback": {
+      "selector": {},
+      "url_attr": "href",
+      "onclick_pattern": "",
+      "query_param": "nl"
+    }
+  }
+}
